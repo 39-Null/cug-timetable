@@ -27,7 +27,7 @@ import io.local.timetable.util.Theme;
 import io.local.timetable.util.Weeks;
 
 /**
- * 课表视图（WakeUp 风格）：
+ * 课表视图：
  * - 三页横滑（上一周 / 本周 / 下一周），跟手 + 回弹动画
  * - 课程块默认按 1-2 节跨两行显示
  * - 长按课程可拖动（移动）或拖下边缘（改结束节次）
