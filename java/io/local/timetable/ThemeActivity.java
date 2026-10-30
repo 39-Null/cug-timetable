@@ -5,7 +5,9 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -267,10 +269,45 @@ public class ThemeActivity extends Activity {
     }
 
     private void pickImage() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*");
-        startActivityForResult(intent, REQ_IMAGE);
+        // 优先图库：Android 13+ 系统照片选择器，其次相册 ACTION_PICK，
+        // 最后才退回文件选择器。
+        if (Build.VERSION.SDK_INT >= 33) {
+            Intent picker = new Intent(MediaStore.ACTION_PICK_IMAGES);
+            picker.setType("image/*");
+            if (tryPick(picker)) {
+                return;
+            }
+        }
+        Intent gallery = new Intent(Intent.ACTION_PICK,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        gallery.setType("image/*");
+        if (tryPick(gallery)) {
+            return;
+        }
+        Intent getContent = new Intent(Intent.ACTION_GET_CONTENT);
+        getContent.addCategory(Intent.CATEGORY_OPENABLE);
+        getContent.setType("image/*");
+        if (tryPick(getContent)) {
+            return;
+        }
+        Intent openDocument = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        openDocument.addCategory(Intent.CATEGORY_OPENABLE);
+        openDocument.setType("image/*");
+        if (tryPick(openDocument)) {
+            return;
+        }
+        Toast.makeText(this, "没有可用的图片选择器", Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean tryPick(Intent intent) {
+        try {
+            // 不要先用 resolveActivity 预检：Android 11+ 的包可见性可能让系统图库
+            // 查不到，但直接 startActivity 仍能正常打开。
+            startActivityForResult(intent, REQ_IMAGE);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
