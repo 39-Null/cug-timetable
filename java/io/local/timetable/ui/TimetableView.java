@@ -15,9 +15,7 @@ import android.widget.Scroller;
 
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -168,9 +166,7 @@ public class TimetableView extends View {
         setBackgroundColor(palette.bg);
         scroller = new Scroller(context);
 
-        Calendar cal = Calendar.getInstance();
-        int dow = cal.get(Calendar.DAY_OF_WEEK);
-        todayColumn = dow == Calendar.SUNDAY ? 7 : dow - 1;
+        todayColumn = Weeks.weekday(Weeks.now());
     }
 
     public void setListener(Listener l) {
@@ -406,22 +402,12 @@ public class TimetableView extends View {
             return null;
         }
         try {
-            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            f.setLenient(false);
-            Date start = f.parse(semesterStart);
-            Date d = f.parse(date);
-            if (start == null || d == null) {
+            Calendar d = Weeks.parseLocalDate(date);
+            if (d == null || Weeks.isBefore(semesterStart, d)
+                    || Weeks.weekOf(semesterStart, d) != week) {
                 return null;
             }
-            long days = (d.getTime() - start.getTime()) / (24L * 3600L * 1000L);
-            int w = (int) (days / 7) + 1;
-            if (w != week) {
-                return null;
-            }
-            Calendar c = Calendar.getInstance();
-            c.setTime(d);
-            int dow = c.get(Calendar.DAY_OF_WEEK);
-            int day = dow == Calendar.SUNDAY ? 7 : dow - 1;
+            int day = Weeks.weekday(d);
             int startSection = sectionOf(clockOf(e.time, true));
             int endSection = startSection;
             String endClock = clockOf(e.time, false);

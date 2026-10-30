@@ -7,6 +7,8 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -44,14 +46,20 @@ public class MainActivity extends Activity implements TimetableView.Listener {
     private TimetableView timetable;
     private TextView weekLabel;
     private List<Course> courses;
-    private boolean weekSynced = false;
     private String themeSig;
-    private String lastToday = "";
     private long semesterId;
     private View dragCard;
     private int dragFrom;
     private float dragDownY;
     private float dragTop;
+    private final Handler midnightHandler = new Handler(Looper.getMainLooper());
+    private final Runnable midnightRefresh = new Runnable() {
+        @Override
+        public void run() {
+            refreshToToday();
+            scheduleMidnightRefresh();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,7 +79,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         } catch (Exception ignored) {
         }
         themeSig = Theme.signature(this);
-        lastToday = Weeks.today();
         semesterId = db.currentSemesterId();
         timetable = findViewById(R.id.timetable);
         timetable.setListener(this);
@@ -87,7 +94,7 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         findViewById(R.id.tabSettings).setOnClickListener(v -> showSettings());
 
         applyThemeUi();
-        refresh();
+        refreshToToday();
         UpdateManager.autoCheck(this);
     }
 
@@ -118,91 +125,102 @@ public class MainActivity extends Activity implements TimetableView.Listener {
             recreate();
             return;
         }
-        // 系统日期变化（例如跨天/跨周）时，如果正停在当前周，就跟着系统走
-        String today = Weeks.today();
-        if (!today.equals(lastToday)) {
-            String start = prefs.semesterStart();
-            if (start != null && !start.isEmpty()) {
-                int oldWeek = Weeks.weekOf(start, lastToday);
-                int newWeek = Weeks.weekOf(start, today);
-                if (prefs.currentWeek() == oldWeek) {
-                    prefs.setCurrentWeek(Math.min(prefs.totalWeeks(), newWeek));
-                }
-            }
-            lastToday = today;
-        }
-        refresh();
+        // B：每次回到前台都重新定位到当前周。
+        refreshToToday();
+        scheduleMidnightRefresh();
         UpdateManager.onResume(this);
     }
 
+    @Override
+    protected void onPause() {
+        midnightHandler.removeCallbacks(midnightRefresh);
+        super.onPause();
+    }
+
+    private void refreshToToday() {
+        refresh(true);
+    }
+
     private void refresh() {
+        refresh(false);
+    }
+
+    private void refresh(boolean forceToday) {
         semesterId = db.currentSemesterId();
         courses = db.courses(semesterId);
-        String start = prefs.semesterStart();
-        // 只在首次进入（或改过开学日期）时按日期跳到当前周；
-        // 之后手动切周不能被 refresh 覆盖。
-        if (!weekSynced && start != null && !start.isEmpty()) {
-            int w = Weeks.weekOf(start, null);
-            if (w > prefs.totalWeeks()) {
-                // 历史学期：从第 1 周开始看
-                w = 1;
+        String start = currentSemesterStart();
+        Calendar now = Weeks.now();
+        int totalWeeks = prefs.totalWeeks();
+        int todayWeek = start.isEmpty() ? -1 : Weeks.weekOf(start, now);
+        boolean beforeStart = !start.isEmpty() && Weeks.isBefore(start, now);
+        int realWeek = beforeStart || todayWeek < 1 ? -1 : todayWeek;
+
+        if (forceToday) {
+            int target = 1;
+            if (!beforeStart && todayWeek >= 1 && todayWeek <= totalWeeks) {
+                target = todayWeek;
             }
-            if (w > 0) {
-                prefs.setCurrentWeek(Math.min(prefs.totalWeeks(), w));
-            }
-            weekSynced = true;
+            prefs.setCurrentWeek(target);
         }
-        if (prefs.currentWeek() > prefs.totalWeeks()) {
-            prefs.setCurrentWeek(prefs.totalWeeks());
-        }
-        weekLabel.setText("第 " + prefs.currentWeek() + " 周");
+
+        int currentWeek = Math.max(1, Math.min(totalWeeks, prefs.currentWeek()));
+        prefs.setCurrentWeek(currentWeek);
+        weekLabel.setText("第 " + currentWeek + " 周");
         timetable.setExams(db.exams(semesterId));
-        timetable.setSemesterStart(prefs.semesterStart());
-        int realWeek = start == null || start.isEmpty() ? -1 : Weeks.weekOf(start, null);
-        if (realWeek > 0 && Weeks.today().compareTo(start) < 0) {
-            realWeek = -1;
-        }
-        int column = todayColumn();
-        timetable.setToday(column, realWeek);
-        timetable.setData(courses, prefs.sections(), prefs.currentWeek(), prefs.totalWeeks(), prefs.sectionTimes(), dayDates());
+        timetable.setSemesterStart(start);
+        timetable.setToday(Weeks.weekday(now), realWeek);
+        timetable.setData(courses, prefs.sections(), currentWeek, totalWeeks,
+                prefs.sectionTimes(), dayDates(start, currentWeek));
         WidgetUpdater.refresh(this);
     }
 
-    /** 今天是周几（1=周一…7=周日），跟随系统时钟。 */
-    private static int todayColumn() {
-        Calendar c = Calendar.getInstance();
-        int dow = c.get(Calendar.DAY_OF_WEEK);
-        return dow == Calendar.SUNDAY ? 7 : dow - 1;
+    /** 当前学期数据库里的开学日，并顺手修正 Prefs，避免两套数据不一致。 */
+    private String currentSemesterStart() {
+        Semester s = db.semester(semesterId);
+        String start = s == null || s.start == null ? "" : s.start.trim();
+        if (!start.equals(prefs.semesterStart())) {
+            prefs.setSemesterStart(start);
+        }
+        return start;
     }
 
     /** 当前周 7 天的日期标签（M/d），没有开学日期则返回空数组。 */
-    private String[] dayDates() {
-        String start = prefs.semesterStart();
+    private String[] dayDates(String start, int week) {
         String[] out = new String[7];
-        if (start == null || start.isEmpty()) {
+        Calendar c = Weeks.parseLocalDate(start);
+        if (c == null) {
             return out;
         }
-        try {
-            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
-            java.util.Calendar c = java.util.Calendar.getInstance();
-            c.setTime(f.parse(start));
-            c.add(java.util.Calendar.DAY_OF_MONTH, (prefs.currentWeek() - 1) * 7);
-            for (int i = 0; i < 7; i++) {
-                out[i] = (c.get(java.util.Calendar.MONTH) + 1) + "/" + c.get(java.util.Calendar.DAY_OF_MONTH);
-                c.add(java.util.Calendar.DAY_OF_MONTH, 1);
-            }
-        } catch (Exception ignored) {
+        c.add(Calendar.DAY_OF_MONTH, (Math.max(1, week) - 1) * 7);
+        for (int i = 0; i < 7; i++) {
+            out[i] = (c.get(Calendar.MONTH) + 1) + "/" + c.get(Calendar.DAY_OF_MONTH);
+            c.add(Calendar.DAY_OF_MONTH, 1);
         }
         return out;
     }
 
-    private void changeWeek(int delta) {
-        int w = prefs.currentWeek();
-        if (delta == 0) {
-            w = 1;
-        } else {
-            w = Math.max(1, Math.min(prefs.totalWeeks(), w + delta));
+    private void scheduleMidnightRefresh() {
+        midnightHandler.removeCallbacks(midnightRefresh);
+        Calendar now = Weeks.now();
+        Calendar next = (Calendar) now.clone();
+        next.add(Calendar.DAY_OF_MONTH, 1);
+        next.set(Calendar.HOUR_OF_DAY, 0);
+        next.set(Calendar.MINUTE, 0);
+        next.set(Calendar.SECOND, 5);
+        next.set(Calendar.MILLISECOND, 0);
+        long delay = next.getTimeInMillis() - now.getTimeInMillis();
+        if (delay < 1000L) {
+            delay = 1000L;
         }
+        midnightHandler.postDelayed(midnightRefresh, delay);
+    }
+
+    private void changeWeek(int delta) {
+        if (delta == 0) {
+            refreshToToday();
+            return;
+        }
+        int w = Math.max(1, Math.min(prefs.totalWeeks(), prefs.currentWeek() + delta));
         prefs.setCurrentWeek(w);
         refresh();
     }
@@ -546,16 +564,7 @@ public class MainActivity extends Activity implements TimetableView.Listener {
     private void switchSemester(Semester s) {
         prefs.setCurrentSemesterId(s.id);
         prefs.setSemesterStart(s.start);
-        int w = 1;
-        if (!s.start.isEmpty()) {
-            w = Weeks.weekOf(s.start, null);
-            if (w < 1 || w > prefs.totalWeeks()) {
-                w = 1;
-            }
-        }
-        prefs.setCurrentWeek(w);
-        weekSynced = true;
-        refresh();
+        refreshToToday();
         Toast.makeText(this, "已切换到：" + s.name, Toast.LENGTH_SHORT).show();
     }
 
@@ -618,9 +627,10 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                     db.updateSemester(s);
                     if (s.id == db.currentSemesterId()) {
                         prefs.setSemesterStart(s.start);
-                        weekSynced = false;
+                        refreshToToday();
+                    } else {
+                        refresh();
                     }
-                    refresh();
                 })
                 .show();
     }
@@ -642,18 +652,18 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                             Semester next = rest.get(0);
                             prefs.setCurrentSemesterId(next.id);
                             prefs.setSemesterStart(next.start);
-                            prefs.setCurrentWeek(1);
-                            weekSynced = true;
                         }
+                        refreshToToday();
+                    } else {
+                        refresh();
                     }
-                    refresh();
                     Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
                 })
                 .show();
     }
 
     private String defaultSemesterName() {
-        Calendar c = Calendar.getInstance();
+        Calendar c = Weeks.now();
         int y = c.get(Calendar.YEAR);
         int m = c.get(Calendar.MONTH) + 1;
         String base = m >= 7 ? y + "-" + (y + 1) + " 第1学期"
@@ -815,8 +825,7 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                         db.updateSemester(sem);
                     }
                     prefs.setSchoolUrl(url.getText().toString().trim());
-                    weekSynced = false;
-                    refresh();
+                    refreshToToday();
                 })
                 .create();
         holder[0] = dialog;

@@ -2,12 +2,9 @@ package io.local.timetable.widget;
 
 import android.content.Context;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import io.local.timetable.db.Db;
 import io.local.timetable.model.Course;
@@ -35,17 +32,16 @@ public final class WidgetData {
         Db db = Db.get(ctx);
         long semesterId = db.currentSemesterId();
         String start = prefs.semesterStart();
-        String today = Weeks.today();
+        Calendar now = Weeks.now();
 
-        Calendar c = Calendar.getInstance();
-        int dow = c.get(Calendar.DAY_OF_WEEK);
-        int day = dow == Calendar.SUNDAY ? 7 : dow - 1;
+        int day = Weeks.weekday(now);
         String[] dayNames = {"", "周一", "周二", "周三", "周四", "周五", "周六", "周日"};
 
+        boolean beforeStart = start != null && !start.isEmpty() && Weeks.isBefore(start, now);
         int week = 0;
         if (start != null && !start.isEmpty()) {
-            week = Weeks.weekOf(start, null);
-            if (week > prefs.totalWeeks() || week < 1) {
+            week = Weeks.weekOf(start, now);
+            if (beforeStart || week > prefs.totalWeeks() || week < 1) {
                 week = 0;
             }
         }
@@ -53,6 +49,8 @@ public final class WidgetData {
             d.weekText = "第 " + week + " 周 · " + dayNames[day];
         } else if (start == null || start.isEmpty()) {
             d.weekText = "未设置开学日";
+        } else if (beforeStart) {
+            d.weekText = "学期未开始";
         } else {
             d.weekText = "学期已结束";
         }
@@ -66,7 +64,7 @@ public final class WidgetData {
                 }
             }
             todayCourses.sort((a, b) -> a.start != b.start ? a.start - b.start : a.end - b.end);
-            int now = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
+            int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
             for (Course course : todayCourses) {
                 Row r = new Row();
                 String s = startClock(times, course.start);
@@ -76,7 +74,7 @@ public final class WidgetData {
                 r.room = course.room == null || course.room.isEmpty() ? "地点待定" : course.room;
                 int a = minutes(s);
                 int b = minutes(e);
-                r.current = a >= 0 && b > a && now >= a && now <= b;
+                r.current = a >= 0 && b > a && nowMinutes >= a && nowMinutes <= b;
                 d.rows.add(r);
             }
         }
@@ -85,20 +83,13 @@ public final class WidgetData {
         Exam best = null;
         long bestDiff = Long.MAX_VALUE;
         String bestDate = "";
-        long today0 = parseDate(today);
-        if (today0 > 0) {
-            for (Exam exam : db.exams(semesterId)) {
-                String date = dateOf(exam.time);
-                long t = parseDate(date);
-                if (t <= 0) {
-                    continue;
-                }
-                long diff = (t - today0) / (24L * 3600L * 1000L);
-                if (diff >= 0 && diff <= 30 && diff < bestDiff) {
-                    best = exam;
-                    bestDiff = diff;
-                    bestDate = date;
-                }
+        for (Exam exam : db.exams(semesterId)) {
+            String date = dateOf(exam.time);
+            long diff = Weeks.daysBetween(date, now);
+            if (diff != Long.MIN_VALUE && diff >= 0 && diff <= 30 && diff < bestDiff) {
+                best = exam;
+                bestDiff = diff;
+                bestDate = date;
             }
         }
         if (best != null) {
@@ -154,17 +145,6 @@ public final class WidgetData {
         java.util.regex.Matcher m = java.util.regex.Pattern
                 .compile("(20\\d{2}-\\d{2}-\\d{2})").matcher(time);
         return m.find() ? m.group(1) : "";
-    }
-
-    private static long parseDate(String date) {
-        try {
-            SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            f.setLenient(false);
-            Date d = f.parse(date);
-            return d == null ? 0 : d.getTime();
-        } catch (Exception e) {
-            return 0;
-        }
     }
 
     private static String clockOf(String time) {
