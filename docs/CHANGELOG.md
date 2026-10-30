@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.0.1 — 2026-10-30
+
+### 修复
+
+- 教务菜单（如「学生个人课表」）通过 `window.open` / `target=_blank` 打开新窗口时，WebView 默认不处理多窗口请求，表现为点击无反应
+- 现已开启 WebView 多窗口，并由 `WebChromeClient.onCreateWindow` 把新窗口 URL 接回主 WebView 打开
+
 ## 1.0.0 — 2026-10-30
 
 首个成品版本。

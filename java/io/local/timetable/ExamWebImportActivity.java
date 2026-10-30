@@ -23,6 +23,7 @@ import io.local.timetable.parse.HtmlExamParser;
 import io.local.timetable.util.Prefs;
 import io.local.timetable.util.Theme;
 import io.local.timetable.util.Ui;
+import io.local.timetable.util.WebViewHelper;
 
 /**
  * 教务「考试信息查询」导入：WebView 里由用户自己登录、查询，
@@ -141,6 +142,7 @@ public class ExamWebImportActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
         web.setWebViewClient(new WebViewClient());
+        WebViewHelper.enablePopups(web);
         applyUserAgent();
         web.setBackgroundColor(p.bg);
 

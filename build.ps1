@@ -1,4 +1,4 @@
-﻿# 泥地课表 — 纯命令行构建（无需 Gradle）
+# 泥地课表 — 纯命令行构建（无需 Gradle）
 # 用法: powershell -ExecutionPolicy Bypass -File build.ps1
 $ErrorActionPreference = 'Stop'
 
@@ -66,7 +66,7 @@ if ($LASTEXITCODE -ne 0) { throw "aapt2 compile failed" }
 Write-Host "[2/7] aapt2 link"
 & "$bt\aapt2.exe" link -o "$build\base.apk" -I $jar --manifest "$root\AndroidManifest.xml" `
     --java "$build\gen" `
-    --min-sdk-version 24 --target-sdk-version 35 --version-code 1 --version-name 1.0 `
+    --min-sdk-version 24 --target-sdk-version 35 --version-code 2 --version-name 1.0.1 `
     "$build\res.zip"
 if ($LASTEXITCODE -ne 0) { throw "aapt2 link failed" }
 

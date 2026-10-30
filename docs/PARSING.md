@@ -148,3 +148,25 @@ jqGrid 字段
    - 考试页字段名是否仍为 `tabGrid_*`
 3. 新增解析分支时，优先按语义字段（id、aria-describedby、title）取值，避免依赖列顺序
 4. 保留兜底链，任何单点失败都不应导致应用崩溃
+
+---
+
+## 8. 菜单弹窗
+
+教务左侧菜单常用 `window.open(url)` 或 `<a target="_blank">` 打开「学生个人课表」「考试信息查询」等子页面。
+
+WebView 默认不处理多窗口请求，点击会表现为**无反应**。应用侧必须：
+
+```
+setSupportMultipleWindows(true)
+setJavaScriptCanOpenWindowsAutomatically(true)
+WebChromeClient.onCreateWindow(...)
+```
+
+`onCreateWindow` 中创建一个临时 WebView，拦截其首个 URL，转交主 WebView：
+
+```
+mainWeb.loadUrl(url)
+```
+
+这样菜单子页面会在同一个 WebView 内打开，后续「提取课表/提取考试」才能读到 DOM。

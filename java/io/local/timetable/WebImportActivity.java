@@ -25,6 +25,7 @@ import io.local.timetable.util.Prefs;
 import io.local.timetable.util.Theme;
 import io.local.timetable.util.Theme;
 import io.local.timetable.util.Ui;
+import io.local.timetable.util.WebViewHelper;
 
 /**
  * 教务网页导入：内嵌 WebView，用户自己登录，登录后点「提取课表」。
@@ -146,6 +147,7 @@ public class WebImportActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
         web.setWebViewClient(new WebViewClient());
+        WebViewHelper.enablePopups(web);
         web.setBackgroundColor(p.bg);
         applyUserAgent();
 

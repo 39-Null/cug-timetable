@@ -214,6 +214,7 @@ Db（写入当前学期）
 特点：
 
 - 只读取**当前渲染后的 DOM**，不模拟登录、不请求接口
+- 正方菜单常用 `window.open` / `target=_blank` 打开子页面；WebView 开启多窗口，`onCreateWindow` 把新窗口 URL 接回主 WebView
 - `looksLikeTimetable` 至少识别 4 个星期名 + 含「节/周」才继续，避免在登录页误解析
 - 覆盖保存只删除当前学期的课程
 
