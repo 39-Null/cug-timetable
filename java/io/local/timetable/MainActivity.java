@@ -102,7 +102,8 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         Theme.Palette p = Theme.p(this);
         boolean hasBg = Theme.hasBackground(this);
         findViewById(R.id.root).setBackgroundColor(hasBg ? Color.TRANSPARENT : p.bg);
-        findViewById(R.id.topBar).setBackgroundColor(hasBg ? p.cardAlpha : p.card);
+        findViewById(R.id.topBar).setBackgroundColor(hasBg
+                ? Theme.withTransparency(p.card, prefs.topBarTransparency()) : p.card);
         findViewById(R.id.bottomBar).setBackgroundColor(hasBg ? p.cardAlpha : p.card);
         ((TextView) findViewById(R.id.title)).setTextColor(p.text);
         ((TextView) findViewById(R.id.btnPrevWeek)).setTextColor(p.sub);

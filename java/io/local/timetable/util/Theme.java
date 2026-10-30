@@ -131,12 +131,20 @@ public final class Theme {
     public static String signature(Context ctx) {
         Prefs p = new Prefs(ctx);
         return (p.dark() ? "d" : "l") + "|" + p.bgImage() + "|" + p.bgDim() + "|" + p.gridAlpha()
+                + "|" + p.topBarTransparency() + "|" + p.sideBarTransparency()
                 + "|" + p.bgStamp();
     }
 
     public static boolean hasBackground(Context ctx) {
         String path = new Prefs(ctx).bgImage();
         return path != null && !path.isEmpty() && new File(path).exists();
+    }
+
+    /** transparency 0=不透明，100=完全透明。 */
+    public static int withTransparency(int color, int transparency) {
+        int t = Math.max(0, Math.min(100, transparency));
+        int alpha = 255 * (100 - t) / 100;
+        return (color & 0x00FFFFFF) | (alpha << 24);
     }
 
     /** 按屏幕尺寸降采样解码，避免大照片把内存撑爆。 */

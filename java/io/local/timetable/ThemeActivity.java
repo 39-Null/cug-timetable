@@ -48,13 +48,14 @@ public class ThemeActivity extends Activity {
         Theme.Palette p = Theme.p(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(p.bg);
+        root.setBackgroundColor(Theme.hasBackground(this) ? Color.TRANSPARENT : p.bg);
 
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(Ui.dpInt(this, 16), Ui.dpInt(this, 12), Ui.dpInt(this, 12), Ui.dpInt(this, 12));
-        bar.setBackgroundColor(p.card);
+        bar.setBackgroundColor(Theme.hasBackground(this)
+                ? Theme.withTransparency(p.card, prefs.topBarTransparency()) : p.card);
 
         TextView back = new TextView(this);
         back.setText("‹");
@@ -199,6 +200,79 @@ public class ThemeActivity extends Activity {
         note.setTextColor(p.faint);
         note.setPadding(0, Ui.dpInt(this, 2), 0, 0);
         box.addView(note);
+
+        box.addView(section("上边栏透明度"));
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        SeekBar topBar = new SeekBar(this);
+        topBar.setMax(100);
+        topBar.setProgress(prefs.topBarTransparency());
+        TextView topValue = new TextView(this);
+        topValue.setText(prefs.topBarTransparency() + "%");
+        topValue.setTextSize(13);
+        topValue.setTextColor(p.sub);
+        topValue.setMinWidth(Ui.dpInt(this, 48));
+        topValue.setGravity(Gravity.END);
+        topBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                topValue.setText(progress + "%");
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                prefs.setTopBarTransparency(seekBar.getProgress());
+                recreate();
+            }
+        });
+        topRow.addView(topBar, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        topRow.addView(topValue);
+        box.addView(topRow);
+
+        box.addView(section("侧边栏透明度"));
+        LinearLayout sideRow = new LinearLayout(this);
+        sideRow.setOrientation(LinearLayout.HORIZONTAL);
+        sideRow.setGravity(Gravity.CENTER_VERTICAL);
+        SeekBar sideBar = new SeekBar(this);
+        sideBar.setMax(100);
+        sideBar.setProgress(prefs.sideBarTransparency());
+        TextView sideValue = new TextView(this);
+        sideValue.setText(prefs.sideBarTransparency() + "%");
+        sideValue.setTextSize(13);
+        sideValue.setTextColor(p.sub);
+        sideValue.setMinWidth(Ui.dpInt(this, 48));
+        sideValue.setGravity(Gravity.END);
+        sideBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                sideValue.setText(progress + "%");
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                prefs.setSideBarTransparency(seekBar.getProgress());
+                recreate();
+            }
+        });
+        sideRow.addView(sideBar, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        sideRow.addView(sideValue);
+        box.addView(sideRow);
+
+        TextView barNote = new TextView(this);
+        barNote.setText("0% 完全不透明，100% 完全透明；仅在设置背景图片时生效。上边栏包含顶部标题和课表星期表头。");
+        barNote.setTextSize(12);
+        barNote.setTextColor(p.faint);
+        barNote.setPadding(0, Ui.dpInt(this, 2), 0, 0);
+        box.addView(barNote);
 
         box.addView(section("网格线清晰度"));
         LinearLayout gridRow = new LinearLayout(this);

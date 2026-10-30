@@ -73,6 +73,8 @@ public class TimetableView extends View {
     private boolean transparentBg = false;
     private Theme.Palette palette = Theme.light();
     private int gridAlpha = 100;
+    private int topBarTransparency = 10;
+    private int sideBarTransparency = 10;
     private boolean dark = false;
     private String[] times = new String[0];
     private String[] dayDates = new String[7];
@@ -200,7 +202,10 @@ public class TimetableView extends View {
     public void refreshTheme() {
         palette = Theme.p(getContext());
         dark = Theme.isDark(getContext());
-        gridAlpha = new Prefs(getContext()).gridAlpha();
+        Prefs prefs = new Prefs(getContext());
+        gridAlpha = prefs.gridAlpha();
+        topBarTransparency = prefs.topBarTransparency();
+        sideBarTransparency = prefs.sideBarTransparency();
         setBackgroundColor(transparentBg ? Color.TRANSPARENT : palette.bg);
         invalidate();
     }
@@ -261,8 +266,9 @@ public class TimetableView extends View {
         }
         if (transparentBg) {
             fillPaint.setStyle(Paint.Style.FILL);
-            fillPaint.setColor(palette.cardAlpha);
+            fillPaint.setColor(Theme.withTransparency(palette.card, topBarTransparency));
             canvas.drawRect(0, 0, w, headerHeight, fillPaint);
+            fillPaint.setColor(Theme.withTransparency(palette.card, sideBarTransparency));
             canvas.drawRect(0, headerHeight, leftWidth, h, fillPaint);
         }
 

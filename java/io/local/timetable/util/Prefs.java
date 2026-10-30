@@ -184,6 +184,24 @@ public class Prefs {
         sp.edit().putString("bgImage", path == null ? "" : path).apply();
     }
 
+    /** 上边栏透明度 0~100；0=不透明，100=完全透明。 */
+    public int topBarTransparency() {
+        return Math.max(0, Math.min(100, sp.getInt("topBarTransparency", 10)));
+    }
+
+    public void setTopBarTransparency(int v) {
+        sp.edit().putInt("topBarTransparency", Math.max(0, Math.min(100, v))).apply();
+    }
+
+    /** 侧边栏透明度 0~100；0=不透明，100=完全透明。 */
+    public int sideBarTransparency() {
+        return Math.max(0, Math.min(100, sp.getInt("sideBarTransparency", 10)));
+    }
+
+    public void setSideBarTransparency(int v) {
+        sp.edit().putInt("sideBarTransparency", Math.max(0, Math.min(100, v))).apply();
+    }
+
     /** 背景遮罩浓度 0~80（百分比），越大文字越清楚。 */
     public int bgDim() {
         return sp.getInt("bgDim", 55);
