@@ -910,7 +910,9 @@ public class MainActivity extends Activity implements TimetableView.Listener {
             c.day = presetDay > 0 ? presetDay : 1;
             c.start = Math.max(1, presetStart > 0 ? presetStart : 1);
             c.end = Math.min(prefs.sections(), c.start + 1);
-            c.weeks = "1-" + prefs.totalWeeks();
+            // 新增课程默认只排本周：周次填当前周，例如第 9 周 → "9"。
+            c.weeks = String.valueOf(Math.max(1,
+                    Math.min(prefs.totalWeeks(), prefs.currentWeek())));
         }
 
         LinearLayout box = new LinearLayout(this);
@@ -936,7 +938,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         EditText parent = Ui.input(this, "所属课程名（可选）", c.parent);
         box.addView(labelledRow("所属课程", parent));
 
-        box.addView(sectionTitle("详细信息"));
         EditText code = Ui.input(this, "Null", c.code);
         EditText clazz = Ui.input(this, "Null", c.clazz);
         EditText credit = Ui.input(this, "Null", c.credit);
@@ -944,13 +945,29 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         EditText examType = Ui.input(this, "Null", c.examType);
         EditText hours = Ui.input(this, "Null", c.hours);
         EditText note = Ui.input(this, "Null", c.note);
-        box.addView(labelledRow("课程号", code));
-        box.addView(labelledRow("班级", clazz));
-        box.addView(labelledRow("学分", credit));
-        box.addView(labelledRow("校区", campus));
-        box.addView(labelledRow("考核", examType));
-        box.addView(labelledRow("学时", hours));
-        box.addView(labelledRow("备注", note));
+
+        LinearLayout detailBox = new LinearLayout(this);
+        detailBox.setOrientation(LinearLayout.VERTICAL);
+        detailBox.addView(labelledRow("课程号", code));
+        detailBox.addView(labelledRow("班级", clazz));
+        detailBox.addView(labelledRow("学分", credit));
+        detailBox.addView(labelledRow("校区", campus));
+        detailBox.addView(labelledRow("考核", examType));
+        detailBox.addView(labelledRow("学时", hours));
+        detailBox.addView(labelledRow("备注", note));
+
+        final boolean[] detailOpen = {existing != null};
+        detailBox.setVisibility(detailOpen[0] ? View.VISIBLE : View.GONE);
+        final TextView detailHeader = sectionTitle(detailOpen[0]
+                ? "详细信息（点击收起）" : "详细信息（点击展开）");
+        detailHeader.setOnClickListener(v -> {
+            detailOpen[0] = !detailOpen[0];
+            detailBox.setVisibility(detailOpen[0] ? View.VISIBLE : View.GONE);
+            detailHeader.setText(detailOpen[0]
+                    ? "详细信息（点击收起）" : "详细信息（点击展开）");
+        });
+        box.addView(detailHeader);
+        box.addView(detailBox);
 
         EditText weeks = Ui.input(this, "如 1-5,7-11 或 1-16|1", c.weeks);
         EditText day = Ui.input(this, "1-7", String.valueOf(c.day));
