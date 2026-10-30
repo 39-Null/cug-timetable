@@ -121,10 +121,12 @@ public final class TextCourseParser {
         if (!room.isEmpty()) {
             name = name.replace(room, " ");
         }
-        name = name.replaceAll("[\\[\\]（）()【】]", " ")
+        name = name.replace("【调】", " ")
+                .replaceAll("[\\[\\]（）()【】]", " ")
                 .replaceAll("\\s{2,}", " ")
                 .trim();
-        // 去掉常见分隔符
+        // 去掉教务标记和常见分隔符
+        name = name.replaceAll("[\\s*＊]*[（(]$", "");
         name = name.replaceAll("^[|,，;；\\-\\s]+", "").replaceAll("[|,，;；\\-\\s]+$", "");
         String teacher = "";
         // 末尾 2~4 个汉字当作老师
@@ -195,7 +197,9 @@ public final class TextCourseParser {
         if (!room.isEmpty()) {
             rest = rest.replace(room, " ");
         }
-        rest = rest.replaceAll("[\\[\\]（）()【】|,，;；:：]", " ").replaceAll("\\s{2,}", " ").trim();
+        rest = rest.replace("【调】", " ")
+                .replaceAll("[\\[\\]（）()【】|,，;；:：]", " ")
+                .replaceAll("\\s{2,}", " ").trim();
         if (rest.isEmpty()) {
             return null;
         }
@@ -311,6 +315,8 @@ public final class TextCourseParser {
             }
         }
         String name = flat.substring(0, Math.max(0, cut)).trim();
+        name = name.replace("【调】", " ").trim();
+        name = name.replaceAll("[\\s*＊]*[（(]$", "");
         name = name.replaceAll("[\\*＊]+$", "").trim();
         name = name.replaceAll("[|,，;；:：\\s]+$", "").trim();
         if (name.length() < 2) {

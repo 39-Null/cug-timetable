@@ -29,10 +29,12 @@ public final class HtmlCourseParser {
     private static final Pattern LIST_CELL = Pattern.compile(
             "(?is)<td([^>]*\\sid=\"jc_(\\d{1,2})-(\\d{1,2})-(\\d{1,2})\"[^>]*)>(.*?)</td>");
     /** 一个格子里可能并排放多门课（不同周次），各自一个 timetable_con。 */
-    private static final Pattern COURSE_BLOCK = Pattern.compile(
-            "(?is)<div[^>]*class=\"[^\"]*timetable_con[^\"]*\"[^>]*>(.*?)</div>");
-    private static final Pattern TITLE = Pattern.compile(
-            "(?is)<span[^>]*class=\"[^\"]*title[^\"]*\"[^>]*>(.*?)</span>");
+    private static final Pattern BLOCK_START = Pattern.compile(
+            "(?is)<div[^>]*class=\"[^\"]*timetable_con[^\"]*\"[^>]*>");
+    private static final Pattern DIV_TAG = Pattern.compile("(?is)</?div\\b[^>]*>");
+    private static final Pattern TITLE_START = Pattern.compile(
+            "(?is)<span[^>]*class=\"[^\"]*title[^\"]*\"[^>]*>");
+    private static final Pattern SPAN_TAG = Pattern.compile("(?is)</?span\\b[^>]*>");
     private static final Pattern PARA = Pattern.compile("(?is)<p([^>]*)>(.*?)</p>");
     private static final Pattern ATTR_TITLE = Pattern.compile("(?is)\\stitle=\"([^\"]*)\"");
     private static final Pattern ROWSPAN = Pattern.compile("(?i)rowspan\\s*=\\s*\"?(\\d+)");
@@ -106,15 +108,46 @@ public final class HtmlCourseParser {
         }
     }
 
+    /** 按 div 深度取出每个 timetable_con 的完整内容，兼容内部嵌套 div。 */
+    private static List<String> extractBlocks(String body) {
+        List<String> out = new ArrayList<>();
+        Matcher start = BLOCK_START.matcher(body);
+        int search = 0;
+        while (start.find(search)) {
+            int from = start.end();
+            int depth = 1;
+            Matcher tag = DIV_TAG.matcher(body);
+            tag.region(from, body.length());
+            int end = -1;
+            while (tag.find()) {
+                if (tag.group().startsWith("</")) {
+                    depth--;
+                } else {
+                    depth++;
+                }
+                if (depth == 0) {
+                    end = tag.start();
+                    break;
+                }
+            }
+            if (end < 0) {
+                break;
+            }
+            out.add(body.substring(from, end));
+            search = end + 1;
+        }
+        return out;
+    }
+
     /** 从一段格子里抓出所有 timetable_con，逐门课解析。 */
     private static void addBlocks(String body, int day, int start, int end, List<Course> out) {
         if (body == null || body.isEmpty()) {
             return;
         }
-        Matcher bm = COURSE_BLOCK.matcher(body);
+        List<String> blocks = extractBlocks(body);
         boolean found = false;
-        while (bm.find()) {
-            Course c = parseBlock(bm.group(1), day, start, end);
+        for (String block : blocks) {
+            Course c = parseBlock(block, day, start, end);
             if (c != null) {
                 out.add(c);
                 found = true;
@@ -131,10 +164,7 @@ public final class HtmlCourseParser {
 
     private static Course parseBlock(String block, int day, int start, int end) {
         Course c = new Course("", day, start, Math.max(start, end), "1-20");
-        Matcher tm = TITLE.matcher(block);
-        if (tm.find()) {
-            c.name = cleanName(cellText(tm.group(1)));
-        }
+        c.name = cleanName(cellText(extractTitle(block)));
 
         StringBuilder extra = new StringBuilder();
         String time = "";
@@ -299,14 +329,42 @@ public final class HtmlCourseParser {
         return note.replaceAll("[;；\\s]+$", "").replaceAll("^[;；\\s]+", "").trim();
     }
 
+    /** 取 title 的完整内容；课程名前有时会嵌一层 <span>【调】</span>。 */
+    private static String extractTitle(String block) {
+        Matcher start = TITLE_START.matcher(block);
+        if (!start.find()) {
+            return "";
+        }
+        int from = start.end();
+        int depth = 1;
+        Matcher tag = SPAN_TAG.matcher(block);
+        tag.region(from, block.length());
+        while (tag.find()) {
+            if (tag.group().startsWith("</")) {
+                depth--;
+            } else {
+                depth++;
+            }
+            if (depth == 0) {
+                return block.substring(from, tag.start());
+            }
+        }
+        return block.substring(from);
+    }
+
     private static String cleanName(String name) {
         if (name == null) {
             return "";
         }
-        return name.replace('\u00a0', ' ').replace('\u3000', ' ')
-                .replaceAll("[\\*＊\\s]+$", "")
-                .replaceAll("^[\\s*＊]+", "")
+        String s = name.replace('\u00a0', ' ').replace('\u3000', ' ')
+                .replace("【调】", " ")
+                .replaceAll("\\s+", " ")
                 .trim();
+        // 去掉教务标题常见的尾缀：*、单独的左括号
+        s = s.replaceAll("[\\s*＊]*[（(]$", "");
+        s = s.replaceAll("[\\*＊\\s]+$", "");
+        s = s.replaceAll("^[\\s*＊]+", "");
+        return s.trim();
     }
 
     // ---------------- 通用表格兜底 ----------------
