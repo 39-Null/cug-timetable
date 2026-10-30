@@ -5,7 +5,6 @@ import android.app.AlertDialog;
 import android.appwidget.AppWidgetManager;
 import android.content.Intent;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
@@ -19,8 +18,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -33,7 +30,6 @@ import io.local.timetable.model.Exam;
 import io.local.timetable.model.Semester;
 import io.local.timetable.ui.TimetableView;
 import io.local.timetable.update.UpdateManager;
-import io.local.timetable.util.Backup;
 import io.local.timetable.util.Prefs;
 import io.local.timetable.util.Theme;
 import io.local.timetable.util.Ui;
@@ -42,9 +38,6 @@ import io.local.timetable.widget.TimetableWidgetProvider;
 import io.local.timetable.widget.WidgetUpdater;
 
 public class MainActivity extends Activity implements TimetableView.Listener {
-
-    private static final int REQ_BACKUP_EXPORT = 4101;
-    private static final int REQ_BACKUP_IMPORT = 4102;
 
     private Db db;
     private Prefs prefs;
@@ -140,108 +133,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         }
         refresh();
         UpdateManager.onResume(this);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
-            return;
-        }
-        Uri uri = data.getData();
-        if (requestCode == REQ_BACKUP_EXPORT) {
-            exportBackup(uri);
-        } else if (requestCode == REQ_BACKUP_IMPORT) {
-            confirmImport(uri);
-        }
-    }
-
-    private void exportBackup(final Uri uri) {
-        Toast.makeText(this, "正在导出备份…", Toast.LENGTH_SHORT).show();
-        new Thread(() -> {
-            String error = null;
-            try {
-                OutputStream out = getContentResolver().openOutputStream(uri);
-                if (out == null) {
-                    throw new Exception("无法写入所选文件");
-                }
-                try {
-                    Backup.export(getApplicationContext(), out);
-                } finally {
-                    out.close();
-                }
-            } catch (Exception e) {
-                error = String.valueOf(e.getMessage());
-            }
-            final String failure = error;
-            runOnUiThread(() -> {
-                if (isFinishing()) {
-                    return;
-                }
-                if (failure == null) {
-                    Toast.makeText(this, "备份已导出", Toast.LENGTH_LONG).show();
-                } else {
-                    showMessage("导出失败", failure);
-                }
-            });
-        }, "backup-export").start();
-    }
-
-    private void confirmImport(final Uri uri) {
-        new AlertDialog.Builder(this)
-                .setTitle("导入备份？")
-                .setMessage("会覆盖当前所有学期、课程、考试和设置，确定继续？")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("导入", (d, w) -> importBackup(uri))
-                .show();
-    }
-
-    private void importBackup(final Uri uri) {
-        Toast.makeText(this, "正在导入备份…", Toast.LENGTH_SHORT).show();
-        new Thread(() -> {
-            Backup.Result result = null;
-            String error = null;
-            try {
-                InputStream in = getContentResolver().openInputStream(uri);
-                if (in == null) {
-                    throw new Exception("无法读取所选文件");
-                }
-                try {
-                    result = Backup.restore(getApplicationContext(), in);
-                } finally {
-                    in.close();
-                }
-            } catch (Exception e) {
-                error = String.valueOf(e.getMessage());
-            }
-            final Backup.Result imported = result;
-            final String failure = error;
-            runOnUiThread(() -> {
-                if (isFinishing()) {
-                    return;
-                }
-                if (failure != null) {
-                    showMessage("导入失败", failure);
-                    return;
-                }
-                weekSynced = false;
-                refresh();
-                Toast.makeText(MainActivity.this,
-                        "已导入 " + imported.semesters + " 个学期、"
-                                + imported.courses + " 门课、"
-                                + imported.exams + " 场考试",
-                        Toast.LENGTH_LONG).show();
-                recreate();
-            });
-        }, "backup-import").start();
-    }
-
-    private void showMessage(String title, String message) {
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(message == null || message.isEmpty() ? "未知错误" : message)
-                .setPositiveButton("知道了", null)
-                .show();
     }
 
     private void refresh() {
@@ -898,17 +789,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         updateNote.setPadding(0, Ui.dpInt(this, 6), 0, 0);
         box.addView(updateNote);
 
-        box.addView(sectionTitle("数据备份"));
-        TextView export = Ui.ghostButton(this, "导出备份");
-        export.setTextSize(13);
-        box.addView(export);
-        TextView imp = Ui.ghostButton(this, "导入备份");
-        imp.setTextSize(13);
-        box.addView(imp);
-        TextView backupNote = Ui.sub(this, "包含所有学期、课程、考试、设置和背景图。导入会覆盖当前数据。");
-        backupNote.setPadding(0, Ui.dpInt(this, 6), 0, 0);
-        box.addView(backupNote);
-
         box.addView(sectionTitle("反馈"));
         box.addView(feedbackRow("邮箱", "aila20181123@163.com", v -> openMail()));
         box.addView(feedbackRow("GitHub", "github.com/39-Null", v -> openUrl("https://github.com/39-Null")));
@@ -949,46 +829,7 @@ public class MainActivity extends Activity implements TimetableView.Listener {
             }
             UpdateManager.manualCheck(this);
         });
-        export.setOnClickListener(v -> {
-            if (holder[0] != null) {
-                holder[0].dismiss();
-            }
-            exportBackupPicker();
-        });
-        imp.setOnClickListener(v -> {
-            if (holder[0] != null) {
-                holder[0].dismiss();
-            }
-            importBackupPicker();
-        });
         dialog.show();
-    }
-
-    private void exportBackupPicker() {
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/json");
-        String stamp = new java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US)
-                .format(new java.util.Date());
-        intent.putExtra(Intent.EXTRA_TITLE, "cug-timetable-backup-" + stamp + ".json");
-        try {
-            startActivityForResult(intent, REQ_BACKUP_EXPORT);
-        } catch (Exception e) {
-            Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void importBackupPicker() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        intent.putExtra(Intent.EXTRA_MIME_TYPES,
-                new String[]{"application/json", "text/plain", "application/octet-stream"});
-        try {
-            startActivityForResult(intent, REQ_BACKUP_IMPORT);
-        } catch (Exception e) {
-            Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private View feedbackRow(String label, String value, View.OnClickListener click) {

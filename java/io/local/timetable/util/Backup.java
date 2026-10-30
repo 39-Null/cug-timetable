@@ -29,7 +29,10 @@ import io.local.timetable.model.Course;
 import io.local.timetable.model.Exam;
 import io.local.timetable.model.Semester;
 
-/** 整库导出/导入：学期、课程、考试、设置和背景图。导入前完整解析，失败不会清空原数据。 */
+/**
+ * 整库导出/导入后端接口：学期、课程、考试、设置和背景图。
+ * 当前版本不在设置页开放入口，保留给后续版本或内部调用。
+ */
 public final class Backup {
 
     public static final String APP = "io.local.timetable";

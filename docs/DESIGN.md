@@ -399,7 +399,7 @@ DOM 特征：
 - 不支持自定义背景图
 - 不是 HarmonyOS 服务卡片
 
-### 12.5 内置更新与数据备份
+### 12.5 内置更新
 
 更新链路：
 
@@ -423,12 +423,12 @@ DOM 特征：
 - Android 8+ 需要「安装未知应用」授权；Android 12+ 使用 mutable PendingIntent；Android 14+ 兼容 `STATUS_PENDING_USER_ACTION`
 - 权限：`REQUEST_INSTALL_PACKAGES`、`UPDATE_PACKAGES_WITHOUT_USER_ACTION`
 
-数据备份：
+备份接口：
 
-- `Backup` 导出 JSON：schema、学期、课程、考试、设置、作息时间、背景图 Base64
+- 当前版本已移除设置页的导出/导入入口
+- 后端保留 `Backup`、`Db.restoreAll`、`Prefs.restoreFrom`，后续版本或内部调用可直接复用
+- `Backup` 支持 JSON 全量导出/导入：学期、课程、考试、设置、作息时间和背景图 Base64
 - 导入先完整解析和校验，再在一个 SQLite 事务里替换全部数据；失败回滚
-- 导入后恢复当前学期、开学日、主题和背景图
-- 备份文件由用户通过 SAF 选择保存位置，不上传
 
 ---
 
@@ -522,9 +522,11 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - [x] 小组件添加、显示、点击打开、考试提醒
 - [x] 南望山夏/冬作息自动切换
 - [x] 设置 → 检查更新返回「已是最新版本」
-- [x] 导出备份、导入备份往返后学期/课程/考试数量一致
+- [x] 备份后端接口（Backup / Db / Prefs）往返自测通过；前端入口已移除
 - [x] 新版本下载、SHA-256/签名校验、PackageInstaller 安装全流程真机验证
 - [x] Android 12 安装未知应用授权后继续更新，升级后课表数据保留
+- [x] 左右滑动切周阈值缩短到 16% 屏宽；短滑不误切，快速轻扫可切周
+- [x] 设置页已无数据备份入口；`Backup` / `Db.restoreAll` / `Prefs.restoreFrom` 后端接口保留
 
 ---
 

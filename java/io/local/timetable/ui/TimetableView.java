@@ -9,6 +9,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.widget.Scroller;
 
@@ -103,6 +104,11 @@ public class TimetableView extends View {
     private float downY;
     private long downTime;
     private int touchSlop;
+    private VelocityTracker velocityTracker;
+
+    /** 拖动超过 16% 屏宽即切周；快速轻扫则用速度判定。 */
+    private static final float SWIPE_THRESHOLD = 0.16f;
+    private static final float FLING_VELOCITY = 700f;
 
     // 拖动课程
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -662,6 +668,12 @@ public class TimetableView extends View {
                 dragMode = false;
                 resizeMode = false;
                 dragCourse = null;
+                if (velocityTracker == null) {
+                    velocityTracker = VelocityTracker.obtain();
+                } else {
+                    velocityTracker.clear();
+                }
+                velocityTracker.addMovement(event);
                 if (scrollOffset == 0) {
                     handler.postDelayed(longPressRunnable, 380);
                 }
@@ -670,6 +682,9 @@ public class TimetableView extends View {
             case MotionEvent.ACTION_MOVE:
                 float dx = event.getX() - downX;
                 float dy = event.getY() - downY;
+                if (velocityTracker != null) {
+                    velocityTracker.addMovement(event);
+                }
                 if (dragMode) {
                     updateDrag(event.getY());
                     invalidate();
@@ -680,6 +695,16 @@ public class TimetableView extends View {
                     handler.removeCallbacks(longPressRunnable);
                 }
                 if (scrolling) {
+                    // 边界周加阻尼，正常情况最多拖一页，避免拖出空白。
+                    if ((dx < 0 && currentWeek >= totalWeeks) || (dx > 0 && currentWeek <= 1)) {
+                        dx *= 0.22f;
+                    }
+                    float limit = getWidth();
+                    if (dx > limit) {
+                        dx = limit;
+                    } else if (dx < -limit) {
+                        dx = -limit;
+                    }
                     scrollOffset = dx;
                     invalidate();
                 } else if (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop) {
@@ -690,12 +715,20 @@ public class TimetableView extends View {
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 handler.removeCallbacks(longPressRunnable);
+                float velocityX = 0f;
+                if (velocityTracker != null) {
+                    velocityTracker.addMovement(event);
+                    velocityTracker.computeCurrentVelocity(1000);
+                    velocityX = velocityTracker.getXVelocity();
+                    velocityTracker.recycle();
+                    velocityTracker = null;
+                }
                 if (dragMode) {
                     finishDrag();
                     return true;
                 }
                 if (scrolling) {
-                    settle();
+                    settle(velocityX);
                     return true;
                 }
                 handleTap(event.getX(), event.getY());
@@ -704,19 +737,27 @@ public class TimetableView extends View {
         return super.onTouchEvent(event);
     }
 
-    private void settle() {
+    private void settle(float velocityX) {
         int w = getWidth();
-        boolean next = scrollOffset < -w * 0.28f;
-        boolean prev = scrollOffset > w * 0.28f;
+        boolean next = scrollOffset < -w * SWIPE_THRESHOLD
+                || (velocityX < -FLING_VELOCITY && scrollOffset < -touchSlop);
+        boolean prev = scrollOffset > w * SWIPE_THRESHOLD
+                || (velocityX > FLING_VELOCITY && scrollOffset > touchSlop);
+        if (next && currentWeek >= totalWeeks) {
+            next = false;
+        }
+        if (prev && currentWeek <= 1) {
+            prev = false;
+        }
         if (next || prev) {
             int target = next ? -w : w;
             int delta = next ? 1 : -1;
-            scroller.startScroll((int) scrollOffset, 0, target - (int) scrollOffset, 0, 220);
+            scroller.startScroll((int) scrollOffset, 0, target - (int) scrollOffset, 0, 200);
             postInvalidateOnAnimation();
             pendingWeekDelta = delta;
             pendingTarget = target;
         } else {
-            scroller.startScroll((int) scrollOffset, 0, -(int) scrollOffset, 0, 180);
+            scroller.startScroll((int) scrollOffset, 0, -(int) scrollOffset, 0, 160);
             postInvalidateOnAnimation();
             pendingWeekDelta = 0;
             pendingTarget = 0;
@@ -844,6 +885,10 @@ public class TimetableView extends View {
 
     @Override
     protected void onDetachedFromWindow() {
+        if (velocityTracker != null) {
+            velocityTracker.recycle();
+            velocityTracker = null;
+        }
         handler.removeCallbacks(longPressCallbacks);
         super.onDetachedFromWindow();
     }
