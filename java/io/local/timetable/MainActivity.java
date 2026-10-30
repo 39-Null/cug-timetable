@@ -785,9 +785,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         TextView checkUpdate = Ui.ghostButton(this, "检查更新");
         checkUpdate.setTextSize(13);
         box.addView(checkUpdate);
-        TextView updateNote = Ui.sub(this, "启动时自动检查；发现新版本后由你决定是否更新。");
-        updateNote.setPadding(0, Ui.dpInt(this, 6), 0, 0);
-        box.addView(updateNote);
 
         box.addView(sectionTitle("反馈"));
         box.addView(feedbackRow("邮箱", "aila20181123@163.com", v -> openMail()));

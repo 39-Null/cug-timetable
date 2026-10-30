@@ -114,12 +114,14 @@ public class WebImportActivity extends Activity {
 
         TextView ua = Ui.ghostButton(this, "电脑模式");
         ua.setTextSize(12);
+        ua.setText(desktopMode ? "电脑模式" : "手机模式");
         LinearLayout.LayoutParams ualp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         ualp.rightMargin = Ui.dpInt(this, 8);
         ua.setOnClickListener(v -> {
             desktopMode = !desktopMode;
             applyUserAgent();
+            ua.setText(desktopMode ? "电脑模式" : "手机模式");
             web.reload();
             Toast.makeText(this, desktopMode ? "已切换电脑模式" : "已切换手机模式", Toast.LENGTH_SHORT).show();
         });
@@ -158,6 +160,8 @@ public class WebImportActivity extends Activity {
     private void applyUserAgent() {
         WebSettings s = web.getSettings();
         s.setUserAgentString(desktopMode ? DESKTOP_UA : null);
+        s.setUseWideViewPort(desktopMode);
+        s.setLoadWithOverviewMode(desktopMode);
     }
 
     private void extract() {

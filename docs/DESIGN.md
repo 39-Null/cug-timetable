@@ -527,6 +527,8 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - [x] Android 12 安装未知应用授权后继续更新，升级后课表数据保留
 - [x] 左右滑动切周阈值缩短到 16% 屏宽；短滑不误切，快速轻扫可切周
 - [x] 设置页已无数据备份入口；`Backup` / `Db.restoreAll` / `Prefs.restoreFrom` 后端接口保留
+- [x] 教务导入的电脑/手机模式切换后按钮标签、UA 与页面刷新同步生效
+- [x] 设置页「检查更新」下方说明文字已移除
 
 ---
 
