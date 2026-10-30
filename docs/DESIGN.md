@@ -523,7 +523,8 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - [x] 南望山夏/冬作息自动切换
 - [x] 设置 → 检查更新返回「已是最新版本」
 - [x] 导出备份、导入备份往返后学期/课程/考试数量一致
-- [ ] 新版本下载、SHA-256/签名校验、PackageInstaller 安装全流程真机验证
+- [x] 新版本下载、SHA-256/签名校验、PackageInstaller 安装全流程真机验证
+- [x] Android 12 安装未知应用授权后继续更新，升级后课表数据保留
 
 ---
 
