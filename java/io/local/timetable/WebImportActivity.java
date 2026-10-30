@@ -8,7 +8,6 @@ import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -22,7 +21,6 @@ import io.local.timetable.model.Course;
 import io.local.timetable.parse.HtmlCourseParser;
 import io.local.timetable.parse.TextCourseParser;
 import io.local.timetable.util.Prefs;
-import io.local.timetable.util.Theme;
 import io.local.timetable.util.Theme;
 import io.local.timetable.util.Ui;
 import io.local.timetable.util.WebViewHelper;
@@ -148,7 +146,7 @@ public class WebImportActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(WebViewHelper.httpOnlyClient());
         WebViewHelper.enablePopups(web);
         web.setBackgroundColor(p.bg);
         applyUserAgent();
@@ -225,6 +223,18 @@ public class WebImportActivity extends Activity {
         } catch (Exception e) {
             return value;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (web != null) {
+            web.loadUrl("about:blank");
+            web.clearHistory();
+            web.removeAllViews();
+            web.destroy();
+            web = null;
+        }
+        super.onDestroy();
     }
 
     @Override

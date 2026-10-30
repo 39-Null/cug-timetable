@@ -77,14 +77,14 @@ adb install -r build/cug-timetable.apk
 keystore/release.keystore
 ```
 
-在 `keystore/release.pass` 写入密码，或设置环境变量：
+在 `keystore/release.pass` 写入密码，在 `keystore/release.alias` 写入 key alias，或设置环境变量：
 
 ```powershell
 $env:CUG_KEYSTORE_PASS = "your-password"
 $env:CUG_KEY_ALIAS = "androiddebugkey"
 ```
 
-`build.ps1` 会读取密码文件和别名；keystore 与密码都不会进入仓库。
+`build.ps1` 会读取密码、alias 文件；keystore、密码和 alias 都不会进入仓库。密码通过 `apksigner` 的 `env:` 方式传递，不出现在命令行。
 
 如果还没有 keystore，可以用 `keytool` 生成（之后不要更换）：
 

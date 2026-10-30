@@ -470,7 +470,7 @@ DOM 特征：
 
 ```
 aapt2 compile → aapt2 link → javac → jar → d8
-→ 写入 classes.dex + assets → zipalign → apksigner
+→ 写入 classes*.dex + assets → zipalign → apksigner
 ```
 
 - `compileSdk` 使用已安装的最新 platform
@@ -490,6 +490,8 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - 数据仅存应用私有 SQLite / SharedPreferences
 - 不落盘教务页面 HTML
 - `allowBackup=false`，避免课程数据进入系统云备份
+- WebView 只允许 http/https 导航；弹窗 URL 取到后销毁临时 WebView
+- `network_security_config` 默认禁止明文，仅 `cug.edu.cn` 子域放行 HTTP
 - 权限：`INTERNET`（WebView / GitHub 更新）、`RECEIVE_BOOT_COMPLETED`（小组件跨天刷新）、`REQUEST_INSTALL_PACKAGES` / `UPDATE_PACKAGES_WITHOUT_USER_ACTION`（应用内更新）
 - 更新检查只请求 GitHub Releases，不上传课表、账号或备份文件
 - 备份文件由用户主动导出，内容包含个人课表，需自行妥善保管
@@ -539,6 +541,12 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - [x] 手动翻周后切后台再回前台，回到当前周
 - [x] 前台跨午夜自动刷新日期与当前周
 - [x] 开学日以当前学期数据库记录为准，Prefs 自动同步
+- [x] 课程节次超出范围、周次非法时拒绝保存
+- [x] 新建/编辑学期拒绝重名与非法开学日
+- [x] 追加导入使用事务，批次内冲突被拦截
+- [x] 背景图裁剪边缘不越界
+- [x] WebView 只允许 http/https，导入页退出销毁 WebView
+- [x] 更新包临时文件、完整性校验与全部 dex 打包
 
 ---
 

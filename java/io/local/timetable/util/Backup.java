@@ -37,6 +37,8 @@ public final class Backup {
 
     public static final String APP = "io.local.timetable";
     public static final int SCHEMA = 1;
+    private static final int MAX_BACKUP_CHARS = 16 * 1024 * 1024;
+    private static final int MAX_IMAGE_BASE64_CHARS = 8 * 1024 * 1024;
 
     public static final class Result {
         public int semesters;
@@ -230,9 +232,17 @@ public final class Backup {
         prefs.setCurrentSemesterId(current.id);
         prefs.setSemesterStart(current.start);
 
-        restoreFile(root, "bgImage", Theme.bgFile(ctx));
-        restoreFile(root, "bgSource", Theme.sourceFile(ctx));
-        if (Theme.bgFile(ctx).exists()) {
+        boolean hasBackground = false;
+        try {
+            restoreFile(root, "bgImage", Theme.bgFile(ctx));
+            restoreFile(root, "bgSource", Theme.sourceFile(ctx));
+            hasBackground = Theme.bgFile(ctx).exists();
+        } catch (Exception e) {
+            // 课表数据已恢复；背景图损坏时只丢弃背景，不把整次导入报成失败。
+            Theme.bgFile(ctx).delete();
+            Theme.sourceFile(ctx).delete();
+        }
+        if (hasBackground) {
             prefs.setBgImage(Theme.bgFile(ctx).getAbsolutePath());
             Theme.ensureSource(ctx);
         } else {
@@ -299,6 +309,9 @@ public final class Backup {
             }
             return;
         }
+        if (encoded.length() > MAX_IMAGE_BASE64_CHARS) {
+            throw new Exception("备份中的背景图过大");
+        }
         byte[] data = Base64.decode(encoded, Base64.DEFAULT);
         FileOutputStream out = new FileOutputStream(file);
         try {
@@ -330,6 +343,10 @@ public final class Backup {
         char[] buf = new char[16 * 1024];
         int n;
         while ((n = reader.read(buf)) > 0) {
+            if (sb.length() + n > MAX_BACKUP_CHARS) {
+                reader.close();
+                throw new Exception("备份文件过大");
+            }
             sb.append(buf, 0, n);
         }
         reader.close();

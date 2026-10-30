@@ -204,16 +204,16 @@ public class ImportPreviewActivity extends Activity {
             }
             db.replaceCourses(courses, sem);
         } else {
-            int added = 0;
-            for (Course c : courses) {
-                c.id = 0;
-                c.semesterId = sem;
-                if (db.conflict(c) != null) {
-                    continue;
-                }
-                db.saveCourse(c);
-                added++;
+            String conflict = db.conflictIn(courses);
+            if (conflict != null) {
+                new AlertDialog.Builder(this)
+                        .setTitle("课程时间有重复")
+                        .setMessage(conflict + "\n\n同一格子只能绑定一门课；请先在预览里核对。")
+                        .setPositiveButton("知道了", null)
+                        .show();
+                return;
             }
+            int added = db.appendCourses(courses, sem);
             saved = added;
             if (added < courses.size()) {
                 Toast.makeText(this, "已跳过 " + (courses.size() - added) + " 条重复课程",

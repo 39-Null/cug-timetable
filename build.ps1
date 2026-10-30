@@ -101,27 +101,38 @@ Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $zip = [System.IO.Compression.ZipFile]::Open("$build\unsigned.apk", [System.IO.Compression.ZipArchiveMode]::Update)
-
-$dexEntry = $zip.CreateEntry('classes.dex')
-$os = $dexEntry.Open()
-$is = [System.IO.File]::OpenRead("$build\dex\classes.dex")
-$is.CopyTo($os)
-$is.Dispose()
-$os.Dispose()
-
-$assetRoot = Join-Path $libs 'assets'
-if (Test-Path $assetRoot) {
-    Get-ChildItem $assetRoot -Recurse -File | ForEach-Object {
-        $rel = $_.FullName.Substring($assetRoot.Length + 1).Replace('\', '/')
-        $entry = $zip.CreateEntry("assets/$rel")
-        $os2 = $entry.Open()
-        $is2 = [System.IO.File]::OpenRead($_.FullName)
-        $is2.CopyTo($os2)
-        $is2.Dispose()
-        $os2.Dispose()
+try {
+    # d8 可能生成 classes.dex / classes2.dex / classes3.dex，全部写入。
+    Get-ChildItem "$build\dex\*.dex" -File | ForEach-Object {
+        $entry = $zip.CreateEntry($_.Name)
+        $os = $entry.Open()
+        $is = [System.IO.File]::OpenRead($_.FullName)
+        try {
+            $is.CopyTo($os)
+        } finally {
+            $is.Dispose()
+            $os.Dispose()
+        }
     }
+
+    $assetRoot = Join-Path $libs 'assets'
+    if (Test-Path $assetRoot) {
+        Get-ChildItem $assetRoot -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($assetRoot.Length + 1).Replace('\', '/')
+            $entry = $zip.CreateEntry("assets/$rel")
+            $os2 = $entry.Open()
+            $is2 = [System.IO.File]::OpenRead($_.FullName)
+            try {
+                $is2.CopyTo($os2)
+            } finally {
+                $is2.Dispose()
+                $os2.Dispose()
+            }
+        }
+    }
+} finally {
+    $zip.Dispose()
 }
-$zip.Dispose()
 & "$bt\zipalign.exe" -f -p 4 "$build\unsigned.apk" "$build\aligned.apk"
 if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
 
@@ -142,8 +153,22 @@ if ([string]::IsNullOrWhiteSpace($ksPass)) {
     throw "missing keystore password: set CUG_KEYSTORE_PASS or create keystore/release.pass"
 }
 $alias = $env:CUG_KEY_ALIAS
-if ([string]::IsNullOrWhiteSpace($alias)) { $alias = 'androiddebugkey' }
-cmd /c "`"$bt\apksigner.bat`" sign --ks `"$ks`" --ks-key-alias $alias --ks-pass pass:$ksPass --key-pass pass:$ksPass --out `"$build\cug-timetable.apk`" `"$build\aligned.apk`" >nul 2>&1"
+if ([string]::IsNullOrWhiteSpace($alias)) {
+    $aliasFile = Join-Path $root 'keystore\release.alias'
+    if (Test-Path $aliasFile) {
+        $alias = (Get-Content $aliasFile -Raw).Trim()
+    }
+}
+if ([string]::IsNullOrWhiteSpace($alias)) {
+    throw "missing keystore alias: set CUG_KEY_ALIAS or create keystore/release.alias"
+}
+if ($alias -notmatch '^[A-Za-z0-9._-]+$') {
+    throw "invalid keystore alias: $alias"
+}
+$env:CUG_KEYSTORE_PASS = $ksPass
+& "$bt\apksigner.bat" sign --ks $ks --ks-key-alias $alias `
+    --ks-pass env:CUG_KEYSTORE_PASS --key-pass env:CUG_KEYSTORE_PASS `
+    --out "$build\cug-timetable.apk" "$build\aligned.apk"
 if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
 
 $out = "$build\cug-timetable.apk"

@@ -112,8 +112,7 @@ public class TimetableWidgetProvider extends AppWidgetProvider {
         }
         if (data.rows.isEmpty()) {
             views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
-            views.setTextViewText(R.id.widget_empty,
-                    data.weekText.startsWith("第 ") ? "今天没有课" : "打开 App 设置开学日期");
+            views.setTextViewText(R.id.widget_empty, data.emptyText);
             views.setTextColor(R.id.widget_empty, p.sub);
         } else {
             views.setViewVisibility(R.id.widget_empty, View.GONE);

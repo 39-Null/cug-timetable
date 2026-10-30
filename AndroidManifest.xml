@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.local.timetable"
-    android:versionCode="9"
-    android:versionName="1.1.6">
+    android:versionCode="10"
+    android:versionName="1.1.7">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
 
@@ -16,7 +16,7 @@
         android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme"
         android:allowBackup="false"
-        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true">
 
         <activity

@@ -107,6 +107,9 @@ public class TimetableView extends View {
     /** 拖动超过 16% 屏宽即切周；快速轻扫则用速度判定。 */
     private static final float SWIPE_THRESHOLD = 0.16f;
     private static final float FLING_VELOCITY = 700f;
+    private static final Pattern EXAM_DATE = Pattern.compile("(20\\d{2}-\\d{2}-\\d{2})");
+    private static final Pattern EXAM_CLOCK = Pattern.compile("(\\d{1,2}:\\d{2})(?:-(\\d{1,2}:\\d{2}))?");
+    private static final Pattern CLOCK_PARTS = Pattern.compile("(\\d{1,2}):(\\d{2})");
 
     // 拖动课程
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -482,7 +485,7 @@ public class TimetableView extends View {
         if (time == null) {
             return "";
         }
-        Matcher m = Pattern.compile("(20\\d{2}-\\d{2}-\\d{2})").matcher(time);
+        Matcher m = EXAM_DATE.matcher(time);
         return m.find() ? m.group(1) : "";
     }
 
@@ -490,7 +493,7 @@ public class TimetableView extends View {
         if (time == null) {
             return "";
         }
-        Matcher m = Pattern.compile("(\\d{1,2}:\\d{2})(?:-(\\d{1,2}:\\d{2}))?").matcher(time);
+        Matcher m = EXAM_CLOCK.matcher(time);
         if (!m.find()) {
             return "";
         }
@@ -534,7 +537,7 @@ public class TimetableView extends View {
         if (clock == null) {
             return -1;
         }
-        Matcher m = Pattern.compile("(\\d{1,2}):(\\d{2})").matcher(clock);
+        Matcher m = CLOCK_PARTS.matcher(clock);
         if (!m.find()) {
             return -1;
         }
@@ -741,17 +744,14 @@ public class TimetableView extends View {
             scroller.startScroll((int) scrollOffset, 0, target - (int) scrollOffset, 0, 200);
             postInvalidateOnAnimation();
             pendingWeekDelta = delta;
-            pendingTarget = target;
         } else {
             scroller.startScroll((int) scrollOffset, 0, -(int) scrollOffset, 0, 160);
             postInvalidateOnAnimation();
             pendingWeekDelta = 0;
-            pendingTarget = 0;
         }
     }
 
     private int pendingWeekDelta;
-    private int pendingTarget;
 
     @Override
     public void computeScroll() {

@@ -34,6 +34,7 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.local.timetable.util.Prefs;
 import io.local.timetable.util.Ui;
@@ -313,7 +314,7 @@ public final class UpdateManager {
         box.addView(status);
         box.addView(bar);
 
-        final boolean[] canceled = {false};
+        final AtomicBoolean canceled = new AtomicBoolean(false);
         AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle("正在下载更新")
                 .setView(box)
@@ -322,7 +323,7 @@ public final class UpdateManager {
                 .create();
         dialog.setOnShowListener(d -> {
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
-                canceled[0] = true;
+                canceled.set(true);
                 dialog.dismiss();
             });
         });
@@ -344,7 +345,7 @@ public final class UpdateManager {
                     }
                 }));
             } catch (Exception e) {
-                error = canceled[0] ? null : friendlyNetworkError(e);
+                error = canceled.get() ? null : friendlyNetworkError(e);
             }
             final String failure = error;
             activity.runOnUiThread(() -> {
@@ -352,7 +353,7 @@ public final class UpdateManager {
                 if (dialog.isShowing()) {
                     dialog.dismiss();
                 }
-                if (canceled[0]) {
+                if (canceled.get()) {
                     out.delete();
                     return;
                 }
@@ -382,7 +383,7 @@ public final class UpdateManager {
         void onProgress(long read, long total);
     }
 
-    private static void downloadFile(UpdateInfo info, File out, boolean[] canceled,
+    private static void downloadFile(UpdateInfo info, File out, AtomicBoolean canceled,
                                      Progress progress) throws Exception {
         HttpURLConnection conn = null;
         try {
@@ -401,15 +402,19 @@ public final class UpdateManager {
             }
             long total = info.size > 0 ? info.size : conn.getContentLength();
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            File part = new File(out.getAbsolutePath() + ".part");
+            if (part.exists()) {
+                part.delete();
+            }
             InputStream in = conn.getInputStream();
-            OutputStream os = new FileOutputStream(out);
+            OutputStream os = new FileOutputStream(part);
+            long read = 0;
             try {
                 byte[] buf = new byte[64 * 1024];
-                long read = 0;
                 long lastNotify = 0;
                 int n;
                 while ((n = in.read(buf)) > 0) {
-                    if (canceled[0]) {
+                    if (canceled.get()) {
                         throw new IOException("已取消");
                     }
                     os.write(buf, 0, n);
@@ -423,7 +428,6 @@ public final class UpdateManager {
                 }
                 os.flush();
                 progress.onProgress(read, total);
-                info.downloadedDigest = hex(digest.digest());
             } finally {
                 try {
                     os.close();
@@ -434,6 +438,19 @@ public final class UpdateManager {
                 } catch (Exception ignored) {
                 }
             }
+            if (total > 0 && read != total) {
+                part.delete();
+                throw new IOException("下载不完整：期望 " + total + " 字节，实际 " + read + " 字节");
+            }
+            if (out.exists() && !out.delete()) {
+                part.delete();
+                throw new IOException("无法替换旧更新文件");
+            }
+            if (!part.renameTo(out)) {
+                part.delete();
+                throw new IOException("无法保存更新文件");
+            }
+            info.downloadedDigest = hex(digest.digest());
         } finally {
             if (conn != null) {
                 conn.disconnect();

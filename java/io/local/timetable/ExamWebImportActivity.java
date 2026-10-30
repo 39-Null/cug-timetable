@@ -8,7 +8,6 @@ import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -143,7 +142,7 @@ public class ExamWebImportActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(WebViewHelper.httpOnlyClient());
         WebViewHelper.enablePopups(web);
         applyUserAgent();
         web.setBackgroundColor(p.bg);
@@ -200,6 +199,18 @@ public class ExamWebImportActivity extends Activity {
         } catch (Exception e) {
             return value;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (web != null) {
+            web.loadUrl("about:blank");
+            web.clearHistory();
+            web.removeAllViews();
+            web.destroy();
+            web = null;
+        }
+        super.onDestroy();
     }
 
     @Override

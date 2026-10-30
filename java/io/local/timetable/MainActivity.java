@@ -585,16 +585,27 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                 .setNegativeButton("取消", null)
                 .setPositiveButton("创建", (d, w) -> {
                     String n = name.getText().toString().trim();
+                    String st = start.getText().toString().trim();
                     if (n.isEmpty()) {
                         Toast.makeText(this, "学期名称不能为空", Toast.LENGTH_SHORT).show();
                         return;
                     }
-                    long id = db.addSemester(n, start.getText().toString().trim());
+                    if (db.semesterNameExists(n, 0)) {
+                        Toast.makeText(this, "已存在同名学期", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (Weeks.parseLocalDate(st) == null) {
+                        Toast.makeText(this, "开学日期格式应为 yyyy-MM-dd", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    long id = db.addSemester(n, st);
                     if (id > 0) {
                         Semester s = db.semester(id);
                         if (s != null) {
                             switchSemester(s);
                         }
+                    } else {
+                        Toast.makeText(this, "学期创建失败", Toast.LENGTH_SHORT).show();
                     }
                 })
                 .show();
@@ -618,13 +629,25 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                 .setNeutralButton("删除", (d, w) -> confirmDeleteSemester(s))
                 .setPositiveButton("保存", (d, w) -> {
                     String n = name.getText().toString().trim();
+                    String st = start.getText().toString().trim();
                     if (n.isEmpty()) {
                         Toast.makeText(this, "学期名称不能为空", Toast.LENGTH_SHORT).show();
                         return;
                     }
+                    if (db.semesterNameExists(n, s.id)) {
+                        Toast.makeText(this, "已存在同名学期", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (Weeks.parseLocalDate(st) == null) {
+                        Toast.makeText(this, "开学日期格式应为 yyyy-MM-dd", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     s.name = n;
-                    s.start = start.getText().toString().trim();
-                    db.updateSemester(s);
+                    s.start = st;
+                    if (!db.updateSemester(s)) {
+                        Toast.makeText(this, "学期保存失败", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     if (s.id == db.currentSemesterId()) {
                         prefs.setSemesterStart(s.start);
                         refreshToToday();
@@ -810,6 +833,20 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                 .setNeutralButton("清空数据", (d, w) -> confirmClear())
                 .setNegativeButton("取消", null)
                 .setPositiveButton("保存", (d, w) -> {
+                    String st = startDate.getText().toString().trim();
+                    if (Weeks.parseLocalDate(st) == null) {
+                        Toast.makeText(this, "开学日期格式应为 yyyy-MM-dd", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Semester sem = db.semester(semesterId);
+                    if (sem != null) {
+                        sem.start = st;
+                        if (!db.updateSemester(sem)) {
+                            Toast.makeText(this, "学期保存失败", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                    }
+                    prefs.setSemesterStart(st);
                     try {
                         prefs.setTotalWeeks(Integer.parseInt(weeks.getText().toString().trim()));
                     } catch (Exception ignored) {
@@ -817,12 +854,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                     try {
                         prefs.setSections(Integer.parseInt(sections.getText().toString().trim()));
                     } catch (Exception ignored) {
-                    }
-                    prefs.setSemesterStart(startDate.getText().toString().trim());
-                    Semester sem = db.semester(semesterId);
-                    if (sem != null) {
-                        sem.start = startDate.getText().toString().trim();
-                        db.updateSemester(sem);
                     }
                     prefs.setSchoolUrl(url.getText().toString().trim());
                     refreshToToday();
@@ -1020,18 +1051,31 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                     if (c.weeks.isEmpty()) {
                         c.weeks = "1-" + prefs.totalWeeks();
                     }
-                    try {
-                        c.day = Math.max(1, Math.min(7, Integer.parseInt(day.getText().toString().trim())));
-                    } catch (Exception ignored) {
+                    if (Course.parseWeeks(c.weeks).isEmpty()) {
+                        Toast.makeText(this, "周次格式不正确", Toast.LENGTH_LONG).show();
+                        return;
                     }
+                    int dayValue;
+                    int startValue;
+                    int endValue;
                     try {
-                        c.start = Math.max(1, Integer.parseInt(start.getText().toString().trim()));
-                    } catch (Exception ignored) {
+                        dayValue = Integer.parseInt(day.getText().toString().trim());
+                        startValue = Integer.parseInt(start.getText().toString().trim());
+                        endValue = Integer.parseInt(end.getText().toString().trim());
+                    } catch (Exception e) {
+                        Toast.makeText(this, "星期和节次必须是数字", Toast.LENGTH_LONG).show();
+                        return;
                     }
-                    try {
-                        c.end = Math.max(c.start, Integer.parseInt(end.getText().toString().trim()));
-                    } catch (Exception ignored) {
+                    int maxSection = prefs.sections();
+                    if (dayValue < 1 || dayValue > 7
+                            || startValue < 1 || startValue > maxSection
+                            || endValue < startValue || endValue > maxSection) {
+                        Toast.makeText(this, "节次超出范围：1-" + maxSection, Toast.LENGTH_LONG).show();
+                        return;
                     }
+                    c.day = dayValue;
+                    c.start = startValue;
+                    c.end = endValue;
                     if (c.name.isEmpty()) {
                         Toast.makeText(this, "课程名不能为空", Toast.LENGTH_SHORT).show();
                         return;

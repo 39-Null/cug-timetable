@@ -16,6 +16,7 @@ import io.local.timetable.model.Course;
 import io.local.timetable.model.Exam;
 import io.local.timetable.model.Semester;
 import io.local.timetable.util.Prefs;
+import io.local.timetable.util.Weeks;
 
 /** 本地数据库：学期 + 课程 + 考试。数据只在本机。 */
 public class Db extends SQLiteOpenHelper {
@@ -201,7 +202,9 @@ public class Db extends SQLiteOpenHelper {
     public List<Semester> semesters() {
         List<Semester> list = new ArrayList<>();
         Cursor c = getReadableDatabase().rawQuery(
-                "SELECT id,name,start,created,sort FROM semesters ORDER BY sort ASC, start DESC, id DESC", null);
+                "SELECT s.id,s.name,s.start,s.created,s.sort,"
+                        + "(SELECT COUNT(*) FROM courses c WHERE c.semester_id=s.id) "
+                        + "FROM semesters s ORDER BY s.sort ASC, s.start DESC, s.id DESC", null);
         while (c.moveToNext()) {
             Semester s = new Semester();
             s.id = c.getLong(0);
@@ -209,7 +212,7 @@ public class Db extends SQLiteOpenHelper {
             s.start = safe(c.getString(2));
             s.created = c.getLong(3);
             s.sort = c.getInt(4);
-            s.courseCount = countCourses(s.id);
+            s.courseCount = c.getInt(5);
             list.add(s);
         }
         c.close();
@@ -225,7 +228,33 @@ public class Db extends SQLiteOpenHelper {
         return null;
     }
 
+    /** 学期名是否已存在（可排除正在编辑的学期）。 */
+    public boolean semesterNameExists(String name, long excludeId) {
+        String n = name == null ? "" : name.trim();
+        if (n.isEmpty()) {
+            return false;
+        }
+        Cursor c = null;
+        try {
+            c = getReadableDatabase().rawQuery(
+                    "SELECT COUNT(*) FROM semesters WHERE name=? COLLATE NOCASE AND id<>?",
+                    new String[]{n, String.valueOf(excludeId)});
+            return c.moveToNext() && c.getInt(0) > 0;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
+    }
+
     public long addSemester(String name, String start) {
+        String n = name == null ? "" : name.trim();
+        String st = start == null ? "" : start.trim();
+        if (n.isEmpty() || Weeks.parseLocalDate(st) == null || semesterNameExists(n, 0)) {
+            return -1;
+        }
         int max = 0;
         Cursor c = null;
         try {
@@ -240,8 +269,8 @@ public class Db extends SQLiteOpenHelper {
             }
         }
         ContentValues v = new ContentValues();
-        v.put("name", name == null ? "" : name.trim());
-        v.put("start", start == null ? "" : start.trim());
+        v.put("name", n);
+        v.put("start", st);
         v.put("created", System.currentTimeMillis());
         v.put("sort", max + 1);
         return getWritableDatabase().insert("semesters", null, v);
@@ -263,18 +292,31 @@ public class Db extends SQLiteOpenHelper {
         }
     }
 
-    public void updateSemester(Semester s) {
+    public boolean updateSemester(Semester s) {
+        String n = s.name == null ? "" : s.name.trim();
+        String st = s.start == null ? "" : s.start.trim();
+        if (n.isEmpty() || Weeks.parseLocalDate(st) == null
+                || semesterNameExists(n, s.id)) {
+            return false;
+        }
         ContentValues v = new ContentValues();
-        v.put("name", s.name);
-        v.put("start", s.start);
-        getWritableDatabase().update("semesters", v, "id=?", new String[]{String.valueOf(s.id)});
+        v.put("name", n);
+        v.put("start", st);
+        return getWritableDatabase().update("semesters", v, "id=?",
+                new String[]{String.valueOf(s.id)}) > 0;
     }
 
     public void deleteSemester(long id) {
         SQLiteDatabase db = getWritableDatabase();
-        db.delete("courses", "semester_id=?", new String[]{String.valueOf(id)});
-        db.delete("exams", "semester_id=?", new String[]{String.valueOf(id)});
-        db.delete("semesters", "id=?", new String[]{String.valueOf(id)});
+        db.beginTransaction();
+        try {
+            db.delete("courses", "semester_id=?", new String[]{String.valueOf(id)});
+            db.delete("exams", "semester_id=?", new String[]{String.valueOf(id)});
+            db.delete("semesters", "id=?", new String[]{String.valueOf(id)});
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public int countCourses(long semesterId) {
@@ -405,6 +447,28 @@ public class Db extends SQLiteOpenHelper {
         } finally {
             db.endTransaction();
         }
+    }
+
+    /** 追加导入：整批事务，跳过与已有课程冲突的条目，返回实际写入数量。 */
+    public int appendCourses(List<Course> items, long semesterId) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        int added = 0;
+        try {
+            for (Course item : items) {
+                item.id = 0;
+                item.semesterId = semesterId;
+                if (conflict(item) != null) {
+                    continue;
+                }
+                db.insert("courses", null, courseValues(item, semesterId));
+                added++;
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        return added;
     }
 
     /** 同一天、节次重叠且周次有交集 → 视为冲突；返回冲突描述，没有冲突返回 null。 */
@@ -544,6 +608,32 @@ public class Db extends SQLiteOpenHelper {
         } finally {
             db.endTransaction();
         }
+    }
+
+    /** 追加导入考试：整批事务，失败全部回滚。 */
+    public int appendExams(List<Exam> items, long semesterId) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        int added = 0;
+        try {
+            for (Exam item : items) {
+                item.id = 0;
+                item.semesterId = semesterId;
+                ContentValues v = new ContentValues();
+                v.put("course", item.course);
+                v.put("time", item.time);
+                v.put("place", item.place);
+                v.put("seat", item.seat);
+                v.put("note", item.note);
+                v.put("semester_id", semesterId);
+                db.insert("exams", null, v);
+                added++;
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        return added;
     }
 
     /** 从备份整库恢复：保留原 ID，先清空再事务写入；失败自动回滚。 */

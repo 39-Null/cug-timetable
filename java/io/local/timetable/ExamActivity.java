@@ -24,6 +24,7 @@ import io.local.timetable.model.Exam;
 import io.local.timetable.util.Prefs;
 import io.local.timetable.util.Theme;
 import io.local.timetable.util.Ui;
+import io.local.timetable.util.Weeks;
 import io.local.timetable.widget.WidgetUpdater;
 
 /** 考试安排：列表、手动添加、粘贴导入、教务网页导入入口。 */
@@ -280,14 +281,26 @@ public class ExamActivity extends Activity {
             if (!dm.find()) {
                 continue;
             }
-            String date = String.format("%04d-%02d-%02d", Integer.parseInt(dm.group(1)),
-                    Integer.parseInt(dm.group(2)), Integer.parseInt(dm.group(3)));
-            Matcher tm = TIME.matcher(s.substring(dm.end()));
-            String time = date;
+            int year = Integer.parseInt(dm.group(1));
+            int month = Integer.parseInt(dm.group(2));
+            int dayOfMonth = Integer.parseInt(dm.group(3));
+            if (month < 1 || month > 12 || dayOfMonth < 1 || dayOfMonth > 31) {
+                continue;
+            }
+            String date = String.format("%04d-%02d-%02d", year, month, dayOfMonth);
+            if (Weeks.parseLocalDate(date) == null) {
+                continue;
+            }
             String after = s.substring(dm.end()).trim();
+            Matcher tm = TIME.matcher(after);
+            String time = date;
             if (tm.find()) {
-                time = date + " " + String.format("%02d:%s", Integer.parseInt(tm.group(1)), tm.group(2));
-                after = after.substring(Math.min(after.length(), tm.end())).trim();
+                int hour = Integer.parseInt(tm.group(1));
+                int minute = Integer.parseInt(tm.group(2));
+                if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+                    time = date + " " + String.format("%02d:%s", hour, tm.group(2));
+                    after = after.substring(Math.min(after.length(), tm.end())).trim();
+                }
             }
             String before = s.substring(0, dm.start()).trim();
             Exam e = new Exam();

@@ -183,11 +183,7 @@ public class ExamPreviewActivity extends Activity {
         if (replace) {
             db.replaceExams(exams, sem);
         } else {
-            for (Exam e : exams) {
-                e.id = 0;
-                e.semesterId = sem;
-                db.saveExam(e);
-            }
+            db.appendExams(exams, sem);
         }
         Toast.makeText(this, (replace ? "已覆盖保存 " : "已追加 ") + exams.size() + " 场",
                 Toast.LENGTH_SHORT).show();

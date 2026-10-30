@@ -24,6 +24,7 @@ public final class WidgetData {
 
     public String weekText = "";
     public String examText = "";
+    public String emptyText = "今天没有课";
     public final List<Row> rows = new ArrayList<>();
 
     public static WidgetData load(Context ctx) {
@@ -49,10 +50,13 @@ public final class WidgetData {
             d.weekText = "第 " + week + " 周 · " + dayNames[day];
         } else if (start == null || start.isEmpty()) {
             d.weekText = "未设置开学日";
+            d.emptyText = "打开 App 设置开学日期";
         } else if (beforeStart) {
             d.weekText = "学期未开始";
+            d.emptyText = "学期未开始";
         } else {
             d.weekText = "学期已结束";
+            d.emptyText = "学期已结束";
         }
 
         if (week > 0) {

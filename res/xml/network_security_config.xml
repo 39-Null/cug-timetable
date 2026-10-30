@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 默认禁止明文；仅学校域名允许 HTTP，兼容个别教务子站。 -->
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">cug.edu.cn</domain>
+    </domain-config>
+</network-security-config>

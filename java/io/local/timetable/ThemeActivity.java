@@ -318,12 +318,21 @@ public class ThemeActivity extends Activity {
             if (uri == null) {
                 return;
             }
-            String path = Theme.importBackground(this, uri);
-            if (path == null) {
-                Toast.makeText(this, "图片读取失败", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            startCrop(path);
+            Toast.makeText(this, "正在读取图片…", Toast.LENGTH_SHORT).show();
+            final android.content.Context app = getApplicationContext();
+            new Thread(() -> {
+                String path = Theme.importBackground(app, uri);
+                runOnUiThread(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    if (path == null) {
+                        Toast.makeText(this, "图片读取失败", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    startCrop(path);
+                });
+            }, "background-import").start();
             return;
         }
         if (requestCode == REQ_CROP && resultCode == RESULT_OK) {

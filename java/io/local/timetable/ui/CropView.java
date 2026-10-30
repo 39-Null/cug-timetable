@@ -170,12 +170,8 @@ public class CropView extends View {
         float sy = (frame.top - ty) / scale;
         float sw = frame.width() / scale;
         float sh = frame.height() / scale;
-        sx = Math.max(0, sx);
-        sy = Math.max(0, sy);
-        sw = Math.min(sw, bitmap.getWidth() - sx);
-        sh = Math.min(sh, bitmap.getHeight() - sy);
-        int x = Math.round(sx);
-        int y = Math.round(sy);
+        int x = Math.max(0, Math.min(bitmap.getWidth() - 1, Math.round(sx)));
+        int y = Math.max(0, Math.min(bitmap.getHeight() - 1, Math.round(sy)));
         int w = Math.max(1, Math.min(bitmap.getWidth() - x, Math.round(sw)));
         int h = Math.max(1, Math.min(bitmap.getHeight() - y, Math.round(sh)));
         Bitmap sub = Bitmap.createBitmap(bitmap, x, y, w, h);

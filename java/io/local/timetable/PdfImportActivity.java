@@ -62,8 +62,6 @@ public class PdfImportActivity extends Activity {
         new Thread(() -> {
             List<Course> parsed = new ArrayList<>();
             int rowsTotal = 0;
-            int textLen = 0;
-            final StringBuilder dbg = new StringBuilder();
             String rawText = "";
             String error = null;
             try (InputStream in = getContentResolver().openInputStream(uri)) {
@@ -73,7 +71,6 @@ public class PdfImportActivity extends Activity {
                     for (int i = 0; i < pages; i++) {
                         List<List<String>> rows = PdfTable.extract(doc, i);
                         rowsTotal += rows.size();
-                        if (i == 0) { for (int ri = 0; ri < Math.min(5, rows.size()); ri++) { dbg.append("[r").append(ri).append("]").append(rows.get(ri)).append(" "); } }
                         List<Course> pageCourses = GridCourseParser.parse(rows);
                         if (!pageCourses.isEmpty()) {
                             parsed.addAll(pageCourses);
@@ -82,7 +79,6 @@ public class PdfImportActivity extends Activity {
                     PDFTextStripper stripper = new PDFTextStripper();
                     stripper.setSortByPosition(true);
                     String text = stripper.getText(doc);
-                    textLen = text.length();
                     rawText = text;
                     if (parsed.isEmpty()) {
                         parsed.addAll(TextCourseParser.parse(text));
@@ -96,13 +92,9 @@ public class PdfImportActivity extends Activity {
             final List<Course> result = parsed;
             final String err = error;
             final int rows = rowsTotal;
-            final int chars = textLen;
             final String raw = rawText;
             runOnUiThread(() -> {
                 progress.dismiss();
-                android.util.Log.i("REAPDF", dbg.toString());
-                android.util.Log.i("REAPDF", "rows=" + rows + " chars=" + chars
-                        + " courses=" + result.size() + " error=" + err);
                 if (err != null) {
                     Toast.makeText(this, "解析失败：" + err, Toast.LENGTH_LONG).show();
                     finish();

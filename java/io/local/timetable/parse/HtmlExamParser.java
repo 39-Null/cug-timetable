@@ -363,10 +363,19 @@ public final class HtmlExamParser {
                 return String.format("%04d-%02d-%02d", y, mo, d);
             }
         }
-        String start = String.format("%02d:%s", Integer.parseInt(cm.group(1)), cm.group(2));
+        int h1 = Integer.parseInt(cm.group(1));
+        int m1 = Integer.parseInt(cm.group(2));
+        if (h1 < 0 || h1 > 23 || m1 < 0 || m1 > 59) {
+            return String.format("%04d-%02d-%02d", y, mo, d);
+        }
+        String start = String.format("%02d:%s", h1, cm.group(2));
         String result = String.format("%04d-%02d-%02d %s", y, mo, d, start);
         if (cm.group(3) != null) {
-            result += "-" + String.format("%02d:%s", Integer.parseInt(cm.group(3)), cm.group(4));
+            int h2 = Integer.parseInt(cm.group(3));
+            int m2 = Integer.parseInt(cm.group(4));
+            if (h2 >= 0 && h2 <= 23 && m2 >= 0 && m2 <= 59) {
+                result += "-" + String.format("%02d:%s", h2, cm.group(4));
+            }
         }
         return result;
     }
