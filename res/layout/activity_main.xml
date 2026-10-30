@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingLeft="16dp"
+        android:paddingRight="12dp"
+        android:background="@color/card">
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/title_main"
+            android:textColor="@color/text"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnPrevWeek"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:text="‹"
+            android:textColor="@color/text_sub"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/btnThisWeek"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:text="第 1 周"
+            android:textColor="@color/primary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/btnNextWeek"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:text="›"
+            android:textColor="@color/text_sub"
+            android:textSize="24sp" />
+    </LinearLayout>
+
+    <io.local.timetable.ui.TimetableView
+        android:id="@+id/timetable"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:orientation="horizontal"
+        android:background="@color/card"
+        android:elevation="8dp">
+
+        <TextView
+            android:id="@+id/tabTimetable"
+            style="@style/TabItem"
+            android:text="@string/tab_timetable" />
+
+        <TextView
+            android:id="@+id/tabImport"
+            style="@style/TabItem"
+            android:text="@string/tab_import" />
+
+        <TextView
+            android:id="@+id/tabTheme"
+            style="@style/TabItem"
+            android:text="@string/tab_theme" />
+
+        <TextView
+            android:id="@+id/tabSettings"
+            style="@style/TabItem"
+            android:text="@string/tab_settings" />
+    </LinearLayout>
+</LinearLayout>

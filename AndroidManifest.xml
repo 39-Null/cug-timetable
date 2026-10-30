@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.local.timetable"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@drawable/ic_launcher"
+        android:theme="@style/AppTheme"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true"
+        android:supportsRtl="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ImportPreviewActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".WebImportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".PdfImportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".TextImportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".ExamActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".ExamWebImportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".ExamPreviewActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".ThemeActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".CropActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <receiver
+            android:name=".widget.TimetableWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="io.local.timetable.WIDGET_REFRESH" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/timetable_widget_info" />
+        </receiver>
+
+    </application>
+</manifest>

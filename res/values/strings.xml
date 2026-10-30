@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">泥地课表</string>
+    <string name="title_main">我的课表</string>
+    <string name="tab_timetable">课表</string>
+    <string name="tab_import">导入</string>
+    <string name="tab_exam">考试</string>
+    <string name="tab_theme">主题</string>
+    <string name="tab_settings">设置</string>
+    <string name="this_week">本周</string>
+    <string name="empty_hint">还没有课程\n点下方「导入」开始</string>
+</resources>

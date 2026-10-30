@@ -1,0 +1,25 @@
+# build output
+build/
+*.apk
+*.aab
+
+# local dependencies (fetched by scripts/fetch-pdfbox.ps1)
+libs/
+
+# signing
+keystore/
+*.keystore
+*.jks
+*.p12
+
+# IDE / local config
+local.properties
+.idea/
+.gradle/
+*.iml
+
+# logs / temp
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
