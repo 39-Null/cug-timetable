@@ -74,6 +74,10 @@
 │ PdfImport / TextImport / 手动编辑              │
 │ HtmlCourseParser / HtmlExamParser / PdfTable   │
 ├───────────────────────────────────────────────┤
+│ 更新与备份层                                   │
+│ UpdateManager（GitHub / 校验 / PackageInstaller）│
+│ Backup（JSON 导出导入）                        │
+├───────────────────────────────────────────────┤
 │ 领域层                                         │
 │ Course / Exam / Semester                       │
 │ Weeks（周次） / 冲突规则 / 课表格位计算         │
@@ -91,7 +95,7 @@
 
 - **不使用 Gradle/AndroidX**：项目规模小，手写构建链可以减少依赖与构建不确定性；UI 全部基于 Framework View。
 - **导入放在 WebView**：学校登录可能涉及统一身份认证、验证码、二维码、WebVPN；由用户在真实页面操作，应用只读取渲染后的 DOM，避免模拟登录与会话维护。
-- **本地优先**：所有业务数据落 SQLite；网络仅用于学校页面本身。
+- **本地优先**：所有业务数据落 SQLite；网络仅用于学校页面和 GitHub 更新检查，不上传本地数据。
 
 ---
 
@@ -395,6 +399,37 @@ DOM 特征：
 - 不支持自定义背景图
 - 不是 HarmonyOS 服务卡片
 
+### 12.5 内置更新与数据备份
+
+更新链路：
+
+```
+启动 / 设置 → 检查更新
+  → GET api.github.com/repos/39-Null/cug-timetable/releases/latest
+  → 取 tag、body、assets[].browser_download_url、size、digest
+  → 用户确认
+  → 下载 APK 到 cache
+  → SHA-256 + 包名 + versionCode + 签名校验
+  → PackageInstaller 安装
+  → 系统确认或自更新完成
+```
+
+约束：
+
+- 只使用 GitHub 直链，不接第三方镜像
+- 自动检查限制为 6 小时一次；手动检查不受限制
+- 不自动下载，必须用户点「立即更新」
+- 安装前校验签名必须与当前应用一致；签名不同则提示卸载重装
+- Android 8+ 需要「安装未知应用」授权；Android 12+ 使用 mutable PendingIntent；Android 14+ 兼容 `STATUS_PENDING_USER_ACTION`
+- 权限：`REQUEST_INSTALL_PACKAGES`、`UPDATE_PACKAGES_WITHOUT_USER_ACTION`
+
+数据备份：
+
+- `Backup` 导出 JSON：schema、学期、课程、考试、设置、作息时间、背景图 Base64
+- 导入先完整解析和校验，再在一个 SQLite 事务里替换全部数据；失败回滚
+- 导入后恢复当前学期、开学日、主题和背景图
+- 备份文件由用户通过 SAF 选择保存位置，不上传
+
 ---
 
 ## 13. 冲突与数据校验
@@ -437,8 +472,9 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - `compileSdk` 使用已安装的最新 platform
 - `minSdk 24`，`targetSdk 35`
 - PdfBox 依赖由 `scripts/fetch-pdfbox.ps1` 从 Maven Central 拉取 AAR 并解出 `classes.jar` 与 `assets/`
-- 首次构建自动生成 `keystore/debug.keystore`（仅用于本地安装）
-- 正式发布建议替换为自己的 keystore，并妥善保管
+- 版本号只从 `AndroidManifest.xml` 读取
+- 正式构建固定使用 `keystore/release.keystore`，密码从 `keystore/release.pass` 或 `CUG_KEYSTORE_PASS` 读取
+- keystore 不进入仓库；丢失后无法覆盖升级，务必单独备份
 
 ---
 
@@ -450,7 +486,9 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - 数据仅存应用私有 SQLite / SharedPreferences
 - 不落盘教务页面 HTML
 - `allowBackup=false`，避免课程数据进入系统云备份
-- 权限：`INTERNET`（WebView）、`RECEIVE_BOOT_COMPLETED`（小组件跨天刷新）
+- 权限：`INTERNET`（WebView / GitHub 更新）、`RECEIVE_BOOT_COMPLETED`（小组件跨天刷新）、`REQUEST_INSTALL_PACKAGES` / `UPDATE_PACKAGES_WITHOUT_USER_ACTION`（应用内更新）
+- 更新检查只请求 GitHub Releases，不上传课表、账号或备份文件
+- 备份文件由用户主动导出，内容包含个人课表，需自行妥善保管
 - 教务入口可能使用明文 HTTP（学校统一认证配置），应用无法改变；界面不承诺传输层加密
 
 ---
@@ -462,7 +500,9 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - 导入覆盖只影响当前学期
 - 主题/背景变更通过签名比较触发重建，避免缓存不一致
 - 小组件定时失败不影响应用内数据
-- 所有危险操作（覆盖导入、删除学期、清空当前学期）二次确认
+- 更新下载失败、校验失败、签名不一致均不修改现有数据
+- 备份导入先解析校验，再事务替换；失败回滚
+- 所有危险操作（覆盖导入、删除学期、清空当前学期、导入备份）二次确认
 
 ---
 
@@ -481,6 +521,9 @@ aapt2 compile → aapt2 link → javac → jar → d8
 - [x] 深色主题、背景手动裁剪、遮罩、网格线
 - [x] 小组件添加、显示、点击打开、考试提醒
 - [x] 南望山夏/冬作息自动切换
+- [x] 设置 → 检查更新返回「已是最新版本」
+- [x] 导出备份、导入备份往返后学期/课程/考试数量一致
+- [ ] 新版本下载、SHA-256/签名校验、PackageInstaller 安装全流程真机验证
 
 ---
 

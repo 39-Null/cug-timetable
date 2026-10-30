@@ -8,6 +8,14 @@ $res   = Join-Path $root 'res'
 $srcOut= Join-Path $root 'java'
 $libs  = Join-Path $root 'libs'
 
+# 版本号只从 AndroidManifest.xml 读取，避免两处写死不一致。
+[xml]$manifestXml = Get-Content (Join-Path $root 'AndroidManifest.xml') -Raw
+$versionCode = [string]$manifestXml.manifest.versionCode
+$versionName = [string]$manifestXml.manifest.versionName
+if ([string]::IsNullOrWhiteSpace($versionCode) -or [string]::IsNullOrWhiteSpace($versionName)) {
+    throw "AndroidManifest.xml missing versionCode/versionName"
+}
+
 # ---------- Android SDK ----------
 $sdk = $env:ANDROID_HOME
 if (-not $sdk) { $sdk = $env:ANDROID_SDK_ROOT }
@@ -66,7 +74,7 @@ if ($LASTEXITCODE -ne 0) { throw "aapt2 compile failed" }
 Write-Host "[2/7] aapt2 link"
 & "$bt\aapt2.exe" link -o "$build\base.apk" -I $jar --manifest "$root\AndroidManifest.xml" `
     --java "$build\gen" `
-    --min-sdk-version 24 --target-sdk-version 35 --version-code 2 --version-name 1.0.1 `
+    --min-sdk-version 24 --target-sdk-version 35 --version-code $versionCode --version-name $versionName `
     "$build\res.zip"
 if ($LASTEXITCODE -ne 0) { throw "aapt2 link failed" }
 
@@ -118,13 +126,24 @@ $zip.Dispose()
 if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
 
 Write-Host "[7/7] sign"
-$ks = Join-Path $root 'keystore\debug.keystore'
-if (-not (Test-Path (Split-Path $ks))) { New-Item -ItemType Directory -Force (Split-Path $ks) | Out-Null }
+# 固定 release keystore：所有正式版必须用同一把 key，否则内置更新无法覆盖安装。
+$ks = Join-Path $root 'keystore\release.keystore'
 if (-not (Test-Path $ks)) {
-    cmd /c "`"$keytool`" -genkeypair -keystore `"$ks`" -storepass android -keypass android -alias androiddebugkey -dname `"CN=Android Debug,O=Android,C=US`" -keyalg RSA -keysize 2048 -validity 10000 >nul 2>&1"
-    if ($LASTEXITCODE -ne 0) { throw "keytool failed" }
+    throw "missing release keystore: $ks (put the project release keystore there, do not commit it)"
 }
-cmd /c "`"$bt\apksigner.bat`" sign --ks `"$ks`" --ks-pass pass:android --key-pass pass:android --out `"$build\cug-timetable.apk`" `"$build\aligned.apk`" >nul 2>&1"
+$ksPass = $env:CUG_KEYSTORE_PASS
+if ([string]::IsNullOrWhiteSpace($ksPass)) {
+    $passFile = Join-Path $root 'keystore\release.pass'
+    if (Test-Path $passFile) {
+        $ksPass = (Get-Content $passFile -Raw).Trim()
+    }
+}
+if ([string]::IsNullOrWhiteSpace($ksPass)) {
+    throw "missing keystore password: set CUG_KEYSTORE_PASS or create keystore/release.pass"
+}
+$alias = $env:CUG_KEY_ALIAS
+if ([string]::IsNullOrWhiteSpace($alias)) { $alias = 'androiddebugkey' }
+cmd /c "`"$bt\apksigner.bat`" sign --ks `"$ks`" --ks-key-alias $alias --ks-pass pass:$ksPass --key-pass pass:$ksPass --out `"$build\cug-timetable.apk`" `"$build\aligned.apk`" >nul 2>&1"
 if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
 
 $out = "$build\cug-timetable.apk"

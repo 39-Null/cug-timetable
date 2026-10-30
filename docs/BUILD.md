@@ -67,28 +67,46 @@ adb install -r build/cug-timetable.apk
 
 ## 4. 签名
 
-### 4.1 本地调试
+内置更新要求所有正式版使用同一把 key，否则新 APK 无法覆盖安装。
 
-`build.ps1` 首次运行会自动生成：
+### 4.1 准备 release keystore
+
+把项目 keystore 放到：
 
 ```
-keystore/debug.keystore
-alias: androiddebugkey
-storepass / keypass: android
+keystore/release.keystore
 ```
 
-该文件已被 `.gitignore` 忽略。用它签出的 APK 只适合本机安装/升级。
-
-### 4.2 正式发布
-
-1. 用 `keytool` 生成自己的 keystore
-2. 修改 `build.ps1` 末尾的 `apksigner` 参数，或构建后手动签名：
+在 `keystore/release.pass` 写入密码，或设置环境变量：
 
 ```powershell
-apksigner sign --ks my-release.jks --out cug-timetable-release.apk build/aligned.apk
+$env:CUG_KEYSTORE_PASS = "your-password"
+$env:CUG_KEY_ALIAS = "androiddebugkey"
 ```
 
-3. **务必保管好 keystore**；丢失后无法覆盖安装升级
+`build.ps1` 会读取密码文件和别名；keystore 与密码都不会进入仓库。
+
+如果还没有 keystore，可以用 `keytool` 生成（之后不要更换）：
+
+```powershell
+keytool -genkeypair -keystore keystore/release.keystore `
+  -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 `
+  -dname "CN=CUG Timetable,O=Local,C=CN"
+```
+
+### 4.2 构建
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build.ps1
+```
+
+输出 `build/cug-timetable.apk`，版本号来自 `AndroidManifest.xml`。
+
+### 4.3 注意
+
+- **务必单独备份 `keystore/release.keystore` 和密码**；丢失后无法覆盖升级
+- 更换 key 后，旧版本用户必须卸载重装；重装前先导出 JSON 备份
+- 不要把 keystore 或密码提交到公开仓库
 
 ---
 

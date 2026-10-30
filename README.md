@@ -64,6 +64,14 @@
 - 显示：第几周 + 今天星期、今日课程、最近考试
 - 点击任意位置打开 App；支持设置页一键固定到桌面
 
+### 内置更新与备份
+
+- 启动时自动检查 GitHub Releases，发现新版本后由用户决定是否更新
+- 「设置 → 检查更新」可手动检查
+- 应用内下载 APK，校验 SHA-256、包名、版本号和签名后拉起系统安装器
+- 「设置 → 数据备份」支持导出/导入 JSON，包含所有学期、课程、考试、设置和背景图
+- 更新检查只访问 GitHub Releases，不上传任何本地数据
+
 ---
 
 ## 截图
@@ -99,6 +107,8 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 需要：Windows PowerShell 5+、JDK 8+、Android SDK（build-tools + platform）。
 
+正式构建还需要固定 release keystore（`keystore/release.keystore`）与密码（`keystore/release.pass` 或 `CUG_KEYSTORE_PASS`）。没有固定签名，内置更新无法覆盖安装。
+
 详细环境变量、签名与常见问题见 [docs/BUILD.md](docs/BUILD.md)。
 
 ---
@@ -121,8 +131,9 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 │  ├─ parse/                  # 正方课表、考试、文本、PDF 表格解析
 │  ├─ ui/TimetableView.java   # 自绘课表、三页滑动、拖拽
 │  ├─ ui/CropView.java        # 背景手动裁剪
+│  ├─ update/                 # GitHub 检查、下载、PackageInstaller
 │  ├─ widget/                 # AppWidget Provider / RemoteViews
-│  └─ util/                   # Prefs / Weeks / Theme / Ui
+│  └─ util/                   # Prefs / Weeks / Theme / Ui / Backup
 ├─ res/
 │  ├─ layout/                 # 主界面、小组件、预览
 │  ├─ drawable-*/ic_launcher.png
@@ -155,6 +166,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 - 登录完全发生在学校页面的 WebView 中，应用不读取、不保存密码
 - 课程、考试、学期数据只存在应用私有 SQLite
 - 不落盘任何教务页面 HTML
+- 更新检查只请求 GitHub Releases，仅暴露网络 IP，不上传课表或账号
 - 详细说明见 [docs/PRIVACY.md](docs/PRIVACY.md)
 
 ---

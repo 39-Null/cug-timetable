@@ -546,6 +546,75 @@ public class Db extends SQLiteOpenHelper {
         }
     }
 
+    /** 从备份整库恢复：保留原 ID，先清空再事务写入；失败自动回滚。 */
+    public void restoreAll(List<Semester> semesters, List<Course> courses, List<Exam> exams) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete("courses", null, null);
+            db.delete("exams", null, null);
+            db.delete("semesters", null, null);
+
+            for (Semester s : semesters) {
+                ContentValues v = new ContentValues();
+                if (s.id > 0) {
+                    v.put("id", s.id);
+                }
+                v.put("name", s.name);
+                v.put("start", s.start);
+                v.put("created", s.created);
+                v.put("sort", s.sort);
+                db.insertOrThrow("semesters", null, v);
+            }
+            for (Course c : courses) {
+                ContentValues v = courseValues(c, c.semesterId);
+                if (c.id > 0) {
+                    v.put("id", c.id);
+                }
+                db.insertOrThrow("courses", null, v);
+            }
+            for (Exam e : exams) {
+                ContentValues v = new ContentValues();
+                if (e.id > 0) {
+                    v.put("id", e.id);
+                }
+                v.put("course", e.course);
+                v.put("time", e.time);
+                v.put("place", e.place);
+                v.put("seat", e.seat);
+                v.put("note", e.note);
+                v.put("semester_id", e.semesterId);
+                db.insertOrThrow("exams", null, v);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    private static ContentValues courseValues(Course item, long semesterId) {
+        ContentValues v = new ContentValues();
+        v.put("name", item.name);
+        v.put("teacher", item.teacher);
+        v.put("room", item.room);
+        v.put("day", item.day);
+        v.put("start", item.start);
+        v.put("end", item.end);
+        v.put("weeks", item.weeks);
+        v.put("note", item.note);
+        v.put("color", item.color);
+        v.put("code", item.code);
+        v.put("clazz", item.clazz);
+        v.put("credit", item.credit);
+        v.put("campus", item.campus);
+        v.put("exam_type", item.examType);
+        v.put("hours", item.hours);
+        v.put("type", item.type);
+        v.put("parent", item.parent);
+        v.put("semester_id", semesterId);
+        return v;
+    }
+
     /** 只清空当前学期的课程与考试。 */
     public void clearCurrentSemester() {
         long id = currentSemesterId();

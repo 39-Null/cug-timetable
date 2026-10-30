@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.appwidget.AppWidgetManager;
 import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
@@ -18,6 +19,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -29,6 +32,8 @@ import io.local.timetable.model.Course;
 import io.local.timetable.model.Exam;
 import io.local.timetable.model.Semester;
 import io.local.timetable.ui.TimetableView;
+import io.local.timetable.update.UpdateManager;
+import io.local.timetable.util.Backup;
 import io.local.timetable.util.Prefs;
 import io.local.timetable.util.Theme;
 import io.local.timetable.util.Ui;
@@ -37,6 +42,9 @@ import io.local.timetable.widget.TimetableWidgetProvider;
 import io.local.timetable.widget.WidgetUpdater;
 
 public class MainActivity extends Activity implements TimetableView.Listener {
+
+    private static final int REQ_BACKUP_EXPORT = 4101;
+    private static final int REQ_BACKUP_IMPORT = 4102;
 
     private Db db;
     private Prefs prefs;
@@ -87,6 +95,7 @@ public class MainActivity extends Activity implements TimetableView.Listener {
 
         applyThemeUi();
         refresh();
+        UpdateManager.autoCheck(this);
     }
 
     private void applyThemeUi() {
@@ -130,6 +139,109 @@ public class MainActivity extends Activity implements TimetableView.Listener {
             lastToday = today;
         }
         refresh();
+        UpdateManager.onResume(this);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            return;
+        }
+        Uri uri = data.getData();
+        if (requestCode == REQ_BACKUP_EXPORT) {
+            exportBackup(uri);
+        } else if (requestCode == REQ_BACKUP_IMPORT) {
+            confirmImport(uri);
+        }
+    }
+
+    private void exportBackup(final Uri uri) {
+        Toast.makeText(this, "正在导出备份…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            String error = null;
+            try {
+                OutputStream out = getContentResolver().openOutputStream(uri);
+                if (out == null) {
+                    throw new Exception("无法写入所选文件");
+                }
+                try {
+                    Backup.export(getApplicationContext(), out);
+                } finally {
+                    out.close();
+                }
+            } catch (Exception e) {
+                error = String.valueOf(e.getMessage());
+            }
+            final String failure = error;
+            runOnUiThread(() -> {
+                if (isFinishing()) {
+                    return;
+                }
+                if (failure == null) {
+                    Toast.makeText(this, "备份已导出", Toast.LENGTH_LONG).show();
+                } else {
+                    showMessage("导出失败", failure);
+                }
+            });
+        }, "backup-export").start();
+    }
+
+    private void confirmImport(final Uri uri) {
+        new AlertDialog.Builder(this)
+                .setTitle("导入备份？")
+                .setMessage("会覆盖当前所有学期、课程、考试和设置，确定继续？")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("导入", (d, w) -> importBackup(uri))
+                .show();
+    }
+
+    private void importBackup(final Uri uri) {
+        Toast.makeText(this, "正在导入备份…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            Backup.Result result = null;
+            String error = null;
+            try {
+                InputStream in = getContentResolver().openInputStream(uri);
+                if (in == null) {
+                    throw new Exception("无法读取所选文件");
+                }
+                try {
+                    result = Backup.restore(getApplicationContext(), in);
+                } finally {
+                    in.close();
+                }
+            } catch (Exception e) {
+                error = String.valueOf(e.getMessage());
+            }
+            final Backup.Result imported = result;
+            final String failure = error;
+            runOnUiThread(() -> {
+                if (isFinishing()) {
+                    return;
+                }
+                if (failure != null) {
+                    showMessage("导入失败", failure);
+                    return;
+                }
+                weekSynced = false;
+                refresh();
+                Toast.makeText(MainActivity.this,
+                        "已导入 " + imported.semesters + " 个学期、"
+                                + imported.courses + " 门课、"
+                                + imported.exams + " 场考试",
+                        Toast.LENGTH_LONG).show();
+                recreate();
+            });
+        }, "backup-import").start();
+    }
+
+    private void showMessage(String title, String message) {
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message == null || message.isEmpty() ? "未知错误" : message)
+                .setPositiveButton("知道了", null)
+                .show();
     }
 
     private void refresh() {
@@ -563,14 +675,10 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         box.setPadding(pad, Ui.dpInt(this, 8), pad, 0);
         EditText name = Ui.input(this, "如 2026-2027 第2学期", defaultSemesterName());
         EditText start = Ui.input(this, "第一周周一 yyyy-MM-dd", Weeks.mondayOfThisWeek());
-        TextView calc = Ui.ghostButton(this, "按「现在是第几周」推算开学日");
-        calc.setTextSize(12);
-        calc.setOnClickListener(v -> promptSemesterStart(start));
         box.addView(Ui.sub(this, "学期名称"));
         box.addView(name);
         box.addView(Ui.sub(this, "开学第一周周一"));
         box.addView(start);
-        box.addView(calc);
         new AlertDialog.Builder(this)
                 .setTitle("新建学期")
                 .setView(box)
@@ -599,14 +707,10 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         box.setPadding(pad, Ui.dpInt(this, 8), pad, 0);
         EditText name = Ui.input(this, "学期名称", s.name);
         EditText start = Ui.input(this, "第一周周一 yyyy-MM-dd", s.start);
-        TextView calc = Ui.ghostButton(this, "按「现在是第几周」推算开学日");
-        calc.setTextSize(12);
-        calc.setOnClickListener(v -> promptSemesterStart(start));
         box.addView(Ui.sub(this, "学期名称"));
         box.addView(name);
         box.addView(Ui.sub(this, "开学第一周周一"));
         box.addView(start);
-        box.addView(calc);
         new AlertDialog.Builder(this)
                 .setTitle("编辑学期")
                 .setView(box)
@@ -760,9 +864,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
 
         TextView startLabel = Ui.sub(this, "开学第一周周一");
         EditText startDate = Ui.input(this, "2026-09-28", prefs.semesterStart());
-        TextView calc = Ui.ghostButton(this, "不知道开学日？按「现在是第几周」推算");
-        calc.setTextSize(12);
-        calc.setOnClickListener(v -> promptSemesterStart(startDate));
 
         TextView urlLabel = Ui.sub(this, "教务系统地址");
         EditText url = Ui.input(this, "https://i.cug.edu.cn", prefs.schoolUrl());
@@ -775,7 +876,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         box.addView(sections);
         box.addView(startLabel);
         box.addView(startDate);
-        box.addView(calc);
         box.addView(urlLabel);
         box.addView(url);
 
@@ -788,6 +888,27 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         pinNote.setPadding(0, Ui.dpInt(this, 6), 0, 0);
         box.addView(pinNote);
 
+        box.addView(sectionTitle("更新"));
+        TextView version = Ui.sub(this, "当前版本 " + UpdateManager.currentVersion(this));
+        box.addView(version);
+        TextView checkUpdate = Ui.ghostButton(this, "检查更新");
+        checkUpdate.setTextSize(13);
+        box.addView(checkUpdate);
+        TextView updateNote = Ui.sub(this, "启动时自动检查；发现新版本后由你决定是否更新。");
+        updateNote.setPadding(0, Ui.dpInt(this, 6), 0, 0);
+        box.addView(updateNote);
+
+        box.addView(sectionTitle("数据备份"));
+        TextView export = Ui.ghostButton(this, "导出备份");
+        export.setTextSize(13);
+        box.addView(export);
+        TextView imp = Ui.ghostButton(this, "导入备份");
+        imp.setTextSize(13);
+        box.addView(imp);
+        TextView backupNote = Ui.sub(this, "包含所有学期、课程、考试、设置和背景图。导入会覆盖当前数据。");
+        backupNote.setPadding(0, Ui.dpInt(this, 6), 0, 0);
+        box.addView(backupNote);
+
         box.addView(sectionTitle("反馈"));
         box.addView(feedbackRow("邮箱", "aila20181123@163.com", v -> openMail()));
         box.addView(feedbackRow("GitHub", "github.com/39-Null", v -> openUrl("https://github.com/39-Null")));
@@ -795,7 +916,8 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(box);
 
-        new AlertDialog.Builder(this)
+        final AlertDialog[] holder = new AlertDialog[1];
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("设置")
                 .setView(scroll)
                 .setNeutralButton("清空数据", (d, w) -> confirmClear())
@@ -819,7 +941,54 @@ public class MainActivity extends Activity implements TimetableView.Listener {
                     weekSynced = false;
                     refresh();
                 })
-                .show();
+                .create();
+        holder[0] = dialog;
+        checkUpdate.setOnClickListener(v -> {
+            if (holder[0] != null) {
+                holder[0].dismiss();
+            }
+            UpdateManager.manualCheck(this);
+        });
+        export.setOnClickListener(v -> {
+            if (holder[0] != null) {
+                holder[0].dismiss();
+            }
+            exportBackupPicker();
+        });
+        imp.setOnClickListener(v -> {
+            if (holder[0] != null) {
+                holder[0].dismiss();
+            }
+            importBackupPicker();
+        });
+        dialog.show();
+    }
+
+    private void exportBackupPicker() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        String stamp = new java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US)
+                .format(new java.util.Date());
+        intent.putExtra(Intent.EXTRA_TITLE, "cug-timetable-backup-" + stamp + ".json");
+        try {
+            startActivityForResult(intent, REQ_BACKUP_EXPORT);
+        } catch (Exception e) {
+            Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void importBackupPicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"application/json", "text/plain", "application/octet-stream"});
+        try {
+            startActivityForResult(intent, REQ_BACKUP_IMPORT);
+        } catch (Exception e) {
+            Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private View feedbackRow(String label, String value, View.OnClickListener click) {
@@ -873,44 +1042,6 @@ public class MainActivity extends Activity implements TimetableView.Listener {
         } catch (Exception e) {
             Toast.makeText(this, "没有可用的浏览器", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    /** 用户知道"现在是第 N 周"时，倒推第一周周一，省得去查开学日。 */
-    private void promptSemesterStart(EditText target) {
-        EditText n = Ui.input(this, "如 5", "");
-        n.setInputType(InputType.TYPE_CLASS_NUMBER);
-        int guess = 1;
-        if (!prefs.semesterStart().isEmpty()) {
-            int w = Weeks.weekOf(prefs.semesterStart(), null);
-            if (w > 0) {
-                guess = w;
-            }
-        }
-        n.setText(String.valueOf(guess));
-        new AlertDialog.Builder(this)
-                .setTitle("推算开学日期")
-                .setMessage("填教务系统显示的当前周次，按今天（" + Weeks.today() + "）倒推第一周周一。")
-                .setView(n)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("推算", (d, w) -> {
-                    try {
-                        int current = Integer.parseInt(n.getText().toString().trim());
-                        if (current < 1) {
-                            return;
-                        }
-                        java.util.Calendar c = java.util.Calendar.getInstance();
-                        int dow = c.get(java.util.Calendar.DAY_OF_WEEK);
-                        int delta = dow == java.util.Calendar.SUNDAY
-                                ? -6 : java.util.Calendar.MONDAY - dow;
-                        c.add(java.util.Calendar.DAY_OF_MONTH, delta - (current - 1) * 7);
-                        String s = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-                                .format(c.getTime());
-                        target.setText(s);
-                        Toast.makeText(this, "已推算：" + s, Toast.LENGTH_SHORT).show();
-                    } catch (Exception ignored) {
-                    }
-                })
-                .show();
     }
 
     private void confirmClear() {

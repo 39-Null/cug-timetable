@@ -133,7 +133,7 @@ public class ExamActivity extends Activity {
         }
         if (new Prefs(this).semesterStart().isEmpty()) {
             TextView tip = new TextView(this);
-            tip.setText("还没设置开学日期，考试暂不会显示在课表网格里（设置 → 按第几周推算）。");
+            tip.setText("还没设置开学日期，考试暂不会显示在课表网格里（设置 → 开学第一周周一）。");
             tip.setTextSize(12);
             tip.setTextColor(p.sub);
             tip.setPadding(0, 0, 0, Ui.dpInt(this, 10));

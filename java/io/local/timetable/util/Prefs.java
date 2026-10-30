@@ -3,12 +3,15 @@ package io.local.timetable.util;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONObject;
+
 import java.util.Calendar;
+import java.util.Iterator;
 
 /** 本地设置（全部存 SharedPreferences，不上传）。 */
 public class Prefs {
 
-    private static final String FILE = "settings";
+    public static final String FILE = "settings";
 
     /** 校区：未来城 / 南望山 */
     public static final String CAMPUS_FUTURE = "future";
@@ -215,5 +218,68 @@ public class Prefs {
 
     public void setCurrentSemesterId(long v) {
         sp.edit().putLong("semesterId", v).apply();
+    }
+
+    /** 上次检查更新的时间，用于限制自动检查频率。 */
+    public long lastUpdateCheck() {
+        return sp.getLong("lastUpdateCheck", 0L);
+    }
+
+    public void setLastUpdateCheck(long v) {
+        sp.edit().putLong("lastUpdateCheck", v).apply();
+    }
+
+    /** 自动检查时用户选择“跳过此版本”的版本号。 */
+    public String skipUpdateVersion() {
+        return sp.getString("skipUpdateVersion", "");
+    }
+
+    public void setSkipUpdateVersion(String v) {
+        sp.edit().putString("skipUpdateVersion", v == null ? "" : v).apply();
+    }
+
+    /** 从备份恢复设置；背景图和当前学期由 Backup 单独处理。 */
+    public void restoreFrom(JSONObject o) throws Exception {
+        SharedPreferences.Editor e = sp.edit();
+        if (o.has("totalWeeks")) {
+            e.putInt("totalWeeks", Math.max(1, o.optInt("totalWeeks", 20)));
+        }
+        if (o.has("currentWeek")) {
+            e.putInt("currentWeek", Math.max(1, o.optInt("currentWeek", 1)));
+        }
+        if (o.has("sections")) {
+            e.putInt("sections", Math.max(2, Math.min(16, o.optInt("sections", 12))));
+        }
+        String campus = o.optString("campus", CAMPUS_FUTURE);
+        if (!CAMPUS_FUTURE.equals(campus) && !CAMPUS_NANWANG.equals(campus)) {
+            campus = CAMPUS_FUTURE;
+        }
+        e.putString("campus", campus);
+        if (o.has("semesterStart")) {
+            e.putString("semesterStart", o.optString("semesterStart", ""));
+        }
+        if (o.has("schoolUrl")) {
+            e.putString("schoolUrl", o.optString("schoolUrl", "https://i.cug.edu.cn"));
+        }
+        e.putBoolean("dark", o.optBoolean("dark", false));
+        e.putInt("bgDim", Math.max(0, Math.min(80, o.optInt("bgDim", 55))));
+        e.putInt("gridAlpha", Math.max(0, Math.min(100, o.optInt("gridAlpha", 100))));
+
+        for (String key : sp.getAll().keySet()) {
+            if (key.startsWith("time_")) {
+                e.remove(key);
+            }
+        }
+        JSONObject times = o.optJSONObject("times");
+        if (times != null) {
+            Iterator<String> it = times.keys();
+            while (it.hasNext()) {
+                String key = it.next();
+                if (key.startsWith("time_")) {
+                    e.putString(key, times.optString(key, ""));
+                }
+            }
+        }
+        e.commit();
     }
 }
